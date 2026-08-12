@@ -1,0 +1,26 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "Multiply every experience payout by 2x up to 100x.",
+  author = "albertoatzori",
+  contact = "https://github.com/albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  tags = { "balance", "exp", "grinding", "beginner" },
+  differences = {
+    changed = {
+      "every exp payout is multiplied by the chosen factor, on Red and on Gold",
+      "the factor applies after the participant split and the traded/trainer boosts",
+    },
+    added = {
+      "EXP MULTIPLIER option: OFF (1x), 2x, 3x, 5x, 10x, 30x, 50x, 100x",
+    },
+    known = {
+      "stat experience is deliberately not scaled",
+      "a payout is trimmed so Red's 3-byte exp field cannot wrap on save export",
+      "at 100x a single battle can cross many levels at once, one text box each",
+    },
+  },
+  credits = {
+    { who = "pret/pokered", for_ = "the experience.asm formula this scales" },
+  },
+  compat = { engine = ">=0.0.0-dev <1.0.0", modApi = 2 },
+}
