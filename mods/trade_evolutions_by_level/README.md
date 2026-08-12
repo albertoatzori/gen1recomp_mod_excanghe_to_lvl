@@ -48,6 +48,19 @@ evolution to a mon that gained a level in the battle that just ended
 levels to 41 — or until a Rare Candy does it. That is how every level
 evolution behaves in the original, not something this mod adds.
 
+**The sweep runs once per battle, not once per level.** If a Pokemon crosses
+36 *inside* a battle and keeps going — routine with an exp multiplier — you
+see "grew to level 36!", "37!", "38!" one after another and it evolves when
+the battle ends, as a 38. It looks like 36 and 37 were ignored; they were
+not. The threshold decided *that* it evolves, and the battle decided *when*
+the game got a chance to say so. Vanilla does the same with a BULBASAUR that
+crosses 16 mid-fight.
+
+**A B press during the animation stops it**, exactly as it does for any other
+level evolution, and prints "Huh? ... stopped evolving!". The next offer then
+waits for the next level-up. A real trade evolution cannot be refused; this
+one can, because it is now a level evolution.
+
 **On Gold an Everstone still stops it**, and using an evolution stone on a
 converted species does not trip the new level row either: both gates are
 the engine's own and the rewritten rows go through them unchanged.

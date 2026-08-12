@@ -16,6 +16,7 @@ local T = require("tests.modkit")
 local FsIo = require("tests.fs_io")
 local SaveSerializer = require("src.core.SaveSerializer")
 local Evolution = require("src.pokemon.Evolution")
+local Experience = require("src.battle.Experience")
 
 local MOD = "mods/trade_evolutions_by_level"
 
@@ -123,6 +124,37 @@ Evolution.apply(game, mon, (pending(36, "levelup")), "LEVEL")
 T.eq(mon.species, "FIXMON_C", "the mon became the evolved species")
 T.check(mon.stats.hp > 0, "with stats recalculated for it")
 T.check(game.save.pokedex.owned.FIXMON_C, "and the dex records it as owned")
+
+-- ------- crossing the level mid-battle
+--
+-- Gen 1 sweeps for evolutions ONCE, after the battle ends, on whatever level
+-- the mon finished with -- it does not re-check at each level crossed.  So a
+-- mon that jumps 35 -> 39 inside one fight (what an exp multiplier makes
+-- routine) prints a "grew to level" box for 36, 37, 38 and 39 and only then
+-- evolves, as a 39.  That reads like "it ignored 36", which is why it is
+-- pinned here: the threshold is honoured, the offer is just not per level.
+
+local Growth = require("src.pokemon.Growth")
+local jumper = { species = "FIXMON_B", level = 35, hp = 50,
+                 stats = { hp = 50 }, dvs = {}, statExp = {} }
+jumper.exp = Growth.expForLevel(data.pokemon.FIXMON_B.growthRate, 35,
+                                data.growth_rates)
+
+-- one trainer battle, its six mons knocked out in turn: the payouts land
+-- during the fight, the evolution sweep only runs once it is over
+local strong = { baseExp = 250, baseStats = data.pokemon.FIXMON_B.baseStats }
+local crossed = {}
+for _ = 1, 6 do
+  for _, level in ipairs(Experience.apply(data, jumper, strong, 100, true, 1, false)) do
+    crossed[#crossed + 1] = level
+  end
+end
+T.check(#crossed > 1, "the battle crossed several levels (" ..
+  table.concat(crossed, ", ") .. ")")
+T.eq(crossed[1], 36, "the threshold went by mid-battle, with no offer of its own")
+T.check(jumper.level > 36, "and ended well past the threshold")
+T.eq((Evolution.pendingFor(game, jumper, { kind = "levelup" })), "FIXMON_C",
+  "the after-battle sweep still evolves it")
 
 run.release()
 
