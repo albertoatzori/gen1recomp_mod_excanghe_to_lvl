@@ -14,3 +14,12 @@ match `manifest.version`.
 - `EVOLVE AT` option (2-100, default 36).
 - `TRADING STILL EVOLVES` option (default on) to keep or drop the original
   cable route.
+
+## [1.0.1] - 2026-08-12
+
+### Fixed
+
+- `EVOLVE AT` is now read when the game checks for an evolution instead of
+  once at boot, so the settings screen and the running game can no longer
+  hold different levels. Changing it applies to the next level-up, with no
+  restart.

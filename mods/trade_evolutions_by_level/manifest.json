@@ -1,7 +1,7 @@
 {
   "id": "trade_evolutions_by_level",
   "name": "Trade Evolutions By Level",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -13,7 +13,10 @@
   "optional_dependencies": [],
   "conflicts": [],
   "incompatible": [],
-  "games": ["gen1", "gen2"],
+  "games": [
+    "gen1",
+    "gen2"
+  ],
   "experimental": false,
   "description": "Species that only evolve by trading evolve at level 36 instead."
 }
