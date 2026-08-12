@@ -17,6 +17,10 @@ __pycache__/
 !.github/
 !.gitignore
 !.luacheckrc
+# CONTRIBUTING-mods.md asks every mod that ships a tests/ directory to list
+# it here, and `modkit pack` refuses without it -- so it has to survive a
+# fresh clone like any other source file of the mod.
+!mods/*/.modkitignore
 
 # Android build outputs / local SDK path / packaged payload (keep love-android sources)
 mobile/android/app/build/
