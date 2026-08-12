@@ -1,0 +1,4 @@
+# Kept out of the packaged archive: the suite requires engine modules
+# (tests.modkit, src.core.SaveSerializer), which is a private-require
+# finding against a shipped mod and `pack` treats warnings as fatal.
+tests/trade_evolutions_by_level_test.lua
