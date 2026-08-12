@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mod: [trade_evolutions_by_level, exp_multiplier]
+        mod: [trade_evolutions_by_level, exp_multiplier, party_exp_share, encounter_rate]
 
     steps:
       - uses: actions/checkout@v4

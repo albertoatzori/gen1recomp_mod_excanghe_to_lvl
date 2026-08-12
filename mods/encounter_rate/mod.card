@@ -1,0 +1,25 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "Wild encounters at half, a quarter, or off entirely.",
+  author = "albertoatzori",
+  contact = "https://github.com/albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  tags = { "tweak", "encounters", "quality-of-life", "beginner" },
+  differences = {
+    changed = {
+      "a share of wild encounters is suppressed before the engine picks one",
+    },
+    added = {
+      "WILD ENCOUNTERS option: NORMAL, HALF, QUARTER, OFF",
+    },
+    known = {
+      "fishing is untouched, so OFF still lets you fish",
+      "scripted and static encounters are not wild rolls and are unaffected",
+      "a suppressed step consumes no encounter draw, so a seeded run diverges",
+    },
+  },
+  credits = {
+    { who = "pret/pokered", for_ = "the wild-encounter step the hook wraps" },
+  },
+  compat = { engine = ">=0.0.0-dev <1.0.0", modApi = 2 },
+}
