@@ -1,0 +1,27 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "Trade-only evolutions happen at level 36 instead.",
+  author = "albertoatzori",
+  contact = "https://github.com/albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  tags = { "balance", "data-only", "solo-play", "beginner" },
+  differences = {
+    changed = {
+      "KADABRA, MACHOKE, GRAVELER and HAUNTER evolve at level 36",
+      "on Gold: ONIX, SCYTHER, SEADRA and PORYGON too, held item no longer needed",
+      "species with another route (POLIWHIRL, SLOWPOKE) are left alone",
+    },
+    added = {
+      "EVOLVE AT option (2-100, default 36)",
+      "TRADING STILL EVOLVES option (default on)",
+    },
+    known = {
+      "options are read at load time, so a change needs a restart",
+      "a mod-added species with two trade evolutions can only reach the first",
+    },
+  },
+  credits = {
+    { who = "pret/pokered", for_ = "the EvosMoves table shape this rewrites" },
+  },
+  compat = { engine = ">=0.0.0-dev <1.0.0", modApi = 2 },
+}
