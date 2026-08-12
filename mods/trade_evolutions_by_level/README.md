@@ -40,6 +40,22 @@ Both are read when the mod loads, so a change takes effect on the next boot.
 The two routes never collide: a level row can only fire on a level-up and a
 trade row can only fire on a trade.
 
+## Good to know
+
+**It fires on a level-up, not on reaching the level.** Gen 1 only offers an
+evolution to a mon that gained a level in the battle that just ended
+(`EvolveAfterBattle`), so a HAUNTER you caught at level 40 waits until it
+levels to 41 — or until a Rare Candy does it. That is how every level
+evolution behaves in the original, not something this mod adds.
+
+**On Gold an Everstone still stops it**, and using an evolution stone on a
+converted species does not trip the new level row either: both gates are
+the engine's own and the rewritten rows go through them unchanged.
+
+**Link play sees the change.** `evolutions` is part of the link fingerprint
+(both generations), so a peer running this mod does not match a vanilla
+peer — the same as any other mod that touches species data.
+
 ## How it works
 
 `main.lua` walks the merged species view and rewrites the evolution list of

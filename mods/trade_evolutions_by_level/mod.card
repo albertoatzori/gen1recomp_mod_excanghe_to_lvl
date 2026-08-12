@@ -16,6 +16,8 @@ return {
       "TRADING STILL EVOLVES option (default on)",
     },
     known = {
+      "a mon already past the level waits for its next level-up, as Gen 1 only offers evolutions to mons that leveled in the battle",
+      "evolutions is part of the link fingerprint, so a peer running this does not match a vanilla peer",
       "options are read at load time, so a change needs a restart",
       "a mod-added species with two trade evolutions can only reach the first",
     },

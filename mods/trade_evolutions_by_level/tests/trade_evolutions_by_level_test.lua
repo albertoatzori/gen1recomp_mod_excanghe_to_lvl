@@ -5,11 +5,17 @@
 -- fixture dataset, so the merge, the schema validation and the option read
 -- are the production ones.  The fixture ships no trade evolution of its
 -- own, so each case plants the rows it wants to see rewritten.
+--
+-- The rewritten rows are then fed to the engine's own evolution dispatch --
+-- Red's Evolution.pendingFor, Gold's Evolution.checkMon -- because "the
+-- data says LEVEL 36" and "the mon actually evolves at 36" are two
+-- different claims, and only the second one is the mod's stated effect.
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.modkit")
 local FsIo = require("tests.fs_io")
 local SaveSerializer = require("src.core.SaveSerializer")
+local Evolution = require("src.pokemon.Evolution")
 
 local MOD = "mods/trade_evolutions_by_level"
 
@@ -86,6 +92,38 @@ T.eq(mixed[1].method, "LEVEL", "its own level row is untouched")
 T.eq(mixed[1].level, 16, "at its own level")
 T.eq(mixed[2].method, "TRADE", "and its trade row still needs a cable")
 
+-- ------- the engine's own dispatch, on the merged dataset
+--
+-- pendingFor is the single point both the after-battle sweep
+-- (Evolution.checkParty) and the Rare Candy path go through, and it reads
+-- the merged evolution_methods registry -- so a match here is the mod
+-- working, not the rows merely looking right.
+
+local game = { data = data, save = { pokedex = { seen = {}, owned = {} } } }
+local function pending(level, kind)
+  local species, evo =
+    Evolution.pendingFor(game, { species = "FIXMON_B", level = level },
+                         { kind = kind })
+  return species, evo and evo.method
+end
+
+T.eq(pending(35, "levelup"), nil, "nothing happens at level 35")
+T.eq(pending(36, "levelup"), "FIXMON_C", "it evolves on the level-up to 36")
+T.eq(select(2, pending(36, "levelup")), "LEVEL", "as a level evolution")
+T.eq(pending(50, "levelup"), "FIXMON_C", "and still later, if it got there first")
+T.eq(pending(5, "trade"), "FIXMON_C", "a trade at any level evolves it too")
+T.eq(select(2, pending(5, "trade")), "TRADE", "through the kept trade row")
+T.eq(pending(36, "item"), nil, "no stone gained an effect")
+
+-- and the evolution really lands: apply is what checkParty runs after the
+-- movie, so this is the last step of the flow the mod feeds
+local mon = { species = "FIXMON_B", level = 36, hp = 20,
+              stats = { hp = 20 }, dvs = {}, statExp = {} }
+Evolution.apply(game, mon, (pending(36, "levelup")), "LEVEL")
+T.eq(mon.species, "FIXMON_C", "the mon became the evolved species")
+T.check(mon.stats.hp > 0, "with stats recalculated for it")
+T.check(game.save.pokedex.owned.FIXMON_C, "and the dex records it as owned")
+
 run.release()
 
 -- ------- options: a different level, and trading switched off
@@ -107,7 +145,37 @@ T.eq(#tunedEvos, 1, "keep_trade off drops the cable route")
 T.eq(tunedEvos[1].method, "LEVEL", "leaving one level row")
 T.eq(tunedEvos[1].level, 20, "at the configured level")
 
+local tunedGame = { data = tuned, save = { pokedex = { seen = {}, owned = {} } } }
+local function tunedPending(level, kind)
+  return (Evolution.pendingFor(tunedGame, { species = "FIXMON_B", level = level },
+                               { kind = kind }))
+end
+T.eq(tunedPending(19, "levelup"), nil, "still nothing one level short")
+T.eq(tunedPending(20, "levelup"), "FIXMON_C", "it evolves at the chosen level")
+T.eq(tunedPending(50, "trade"), nil, "and a trade no longer evolves it")
+
 run2.release()
+
+-- ------- a second load (the F5 dev loop, or another mod ahead of this one
+-- having done the same job) must not convert what is already converted
+
+local reloaded = dataset({
+  FIXMON_B = {
+    { method = "LEVEL", level = 36, species = "FIXMON_C" },
+    { method = "TRADE", level = 1, species = "FIXMON_C" },
+  },
+})
+
+local run3 = T.sdk.loadMod(MOD, { data = reloaded, fs = checkoutFs() })
+T.eq(#run3.errors, 0, "loads clean on a converted dataset")
+
+local twice = reloaded.pokemon.FIXMON_B.evolutions
+T.eq(#twice, 2, "the rows are left exactly as they were")
+T.eq(twice[1].method, "LEVEL", "no second level row was appended")
+T.eq(twice[1].level, 36, "at the level the first pass set")
+T.eq(twice[2].method, "TRADE", "and the trade row is not duplicated either")
+
+run3.release()
 
 -- ------- Gold's vocabulary
 --
@@ -170,5 +238,27 @@ local poliwhirl = gold.POLIWHIRL.evolutions
 T.eq(#poliwhirl, 2, "POLIWHIRL is not trade-only, so it is left alone")
 T.eq(poliwhirl[1].method, "EVOLVE_ITEM", "its stone route survives")
 T.eq(poliwhirl[2].method, "EVOLVE_TRADE", "and so does its trade route")
+
+-- the rewritten rows through Gold's own dispatch, which is where its two
+-- cross-cutting gates (a link is up / a stone is being used) and the
+-- Everstone live
+local Gen2Evolution = require("src.core.gen2.Evolution")
+
+local function goldPending(level, ctx, held)
+  -- checkMon takes a dataset, and `gold` is only its species table
+  local entry = Gen2Evolution.checkMon({ pokemon = gold },
+    { species = "ONIX", level = level, item = held,
+      stats = { attack = 45, defense = 160 } }, ctx or {})
+  return entry and entry.method, entry and entry.into
+end
+
+T.eq(goldPending(35, {}), nil, "ONIX does not evolve at 35 after a battle")
+T.eq(goldPending(36, {}), "EVOLVE_LEVEL", "it evolves at 36 with no Metal Coat")
+T.eq(select(2, goldPending(36, {})), "STEELIX", "into STEELIX")
+T.eq(goldPending(36, {}, "EVERSTONE"), nil, "an Everstone still stops it")
+T.eq(goldPending(5, { link = true }, "METAL_COAT"), "EVOLVE_TRADE",
+  "and the Metal Coat trade still evolves it")
+T.eq(goldPending(36, { force = true, item = "FIRE_STONE" }), nil,
+  "using a stone does not trip the new level row")
 
 T.finish("trade_evolutions_by_level")
