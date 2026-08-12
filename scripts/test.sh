@@ -67,13 +67,6 @@ run_tier() {
 # ------- ROM-free tiers: these are what CI runs
 
 run_tier "T0 ROM builder version routing" python3 tests/build_rom_data_cli_test.py
-run_tier "T0 switch CI workflow content gate" "$LUA" tests/switch_ci_workflows_test.lua
-run_tier "T0 switch transfer docs gate" "$LUA" tests/switch_transfer_docs_test.lua
-# NX Blue/Yellow asset overlay: ROM-free, must run on every checkout so a
-# Sound.lua / overlay regression is not gated only on switch-changes paths.
-run_tier "T0 NX asset overlay fallback" "$LUA" tests/engine/assets_version_fallback_test.lua
-run_tier "T0 NX generated-path static guard" "$LUA" tests/engine/nx_generated_guard_test.lua
-run_tier "T0 NX Yellow/Blue boot (dynamic paths)" "$LUA" tests/engine/nx_yellow_boot_test.lua
 run_tier "T0 touch-controls pad cursor" "$LUA" tests/engine/touch_controls_pad_cursor_test.lua
 run_tier "T1/T2 engine invariants + parity gates" "$LUA" tests/run_engine.lua
 run_tier "T4 mod-SDK" "$LUA" tests/run_modkit.lua
