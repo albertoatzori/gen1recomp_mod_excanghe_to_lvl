@@ -37,6 +37,12 @@ Both are read when the mod loads, so a change takes effect on the next boot.
 | `EVOLVE AT` | 36 | the level the converted evolutions fire at (2–100) |
 | `TRADING STILL EVOLVES` | on | keep the original trade route alongside the new level one; turn it off to make the cable stop evolving these lines |
 
+`EVOLVE AT` is read **at the moment the game checks for an evolution**, so
+the number on the settings screen is always the number in force — change it
+and the next level-up already uses it, with no restart. `TRADING STILL
+EVOLVES` shapes the merged evolution rows instead, so that one takes effect
+on the next boot.
+
 The two routes never collide: a level row can only fire on a level-up and a
 trade row can only fire on a trade.
 
