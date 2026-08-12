@@ -23,6 +23,12 @@ local MIN_LEVEL, MAX_LEVEL = 2, 100
 
 -- a trade method id -> the level method id of the same generation
 local LEVEL_METHOD = { TRADE = "LEVEL", EVOLVE_TRADE = "EVOLVE_LEVEL" }
+-- the same pair as a set, for recognising a row this mod wrote
+local LEVEL_METHOD_ID = { LEVEL = true, EVOLVE_LEVEL = true }
+
+-- Gold's one item that refuses an evolution outright; the engine tests it
+-- inside the check this mod answers ahead of, so it is tested here too
+local EVERSTONE = "EVERSTONE"
 
 -- true when the species can evolve, and every way it can is a trade
 local function tradeOnly(evolutions)
@@ -63,14 +69,25 @@ return function(mod)
       default = true },
   })
 
-  local level = math.floor(tonumber(mod.options:get("level")) or DEFAULT_LEVEL)
-  level = math.max(MIN_LEVEL, math.min(MAX_LEVEL, level))
+  -- The level the manager is showing RIGHT NOW.  Read on every decision, not
+  -- once at load: the manager writes a changed option straight into the live
+  -- loader, so a mod that snapshots it at boot ends up enforcing one number
+  -- while the settings screen displays another, with nothing on screen to
+  -- say they disagree.  That is a debugging trap, and the merged rows below
+  -- can only ever hold the value that was current when the game booted.
+  local function wantedLevel()
+    local stored = tonumber(mod.options:get("level")) or DEFAULT_LEVEL
+    return math.max(MIN_LEVEL, math.min(MAX_LEVEL, math.floor(stored)))
+  end
+
+  local level = wantedLevel()
   local keepTrade = mod.options:get("keep_trade") ~= false
 
   -- each() walks the merged view -- the engine's species plus every mod
   -- ahead of this one -- so a mod-added trade evolution is converted too
   -- instead of this hard-coding the four Red lines
   local changed = {}
+  local converted = {}
   for id, mon in mod.content.pokemon:each() do
     -- read the species out before patching it: the row count below has to
     -- describe what was there, not what this loop just wrote
@@ -86,6 +103,7 @@ return function(mod)
       -- to whatever the merged view already says
       mod.content.pokemon:patch(id, { evolutions = rows })
       changed[#changed + 1] = id
+      converted[id] = true
       if #vanilla > 1 then
         -- only reachable through another mod: the first matching row wins,
         -- so the rest can never fire once they all share one level
@@ -95,6 +113,30 @@ return function(mod)
       end
     end
   end
+
+  -- The rows above carry the level as of boot; this is what actually decides,
+  -- so the settings screen is never lying about what the game will do.  Only
+  -- the converted species' level rows are answered here -- every other row,
+  -- including their kept trade row, falls through to the engine, which is
+  -- also how a Gold Everstone and a stone in use keep their say.
+  mod.hooks:wrap("evolution.check", function(next, first, mon, evo, trigger)
+    local species = mon and mon.species
+    if not (species and converted[species] and evo and LEVEL_METHOD_ID[evo.method]) then
+      return next(first, mon, evo, trigger)
+    end
+    if trigger and trigger.kind then
+      -- Gen 1: an explicit trigger, and only a level-up is ours
+      if trigger.kind ~= "levelup" then return next(first, mon, evo, trigger) end
+    else
+      -- Gold: the after-battle sweep is the moment with neither a link up
+      -- nor a stone being forced; leave both of those to the engine
+      if trigger and (trigger.link or trigger.force) then
+        return next(first, mon, evo, trigger)
+      end
+      if mon.item == EVERSTONE then return next(first, mon, evo, trigger) end
+    end
+    return (mon.level or 0) >= wantedLevel()
+  end)
 
   table.sort(changed)
   if #changed == 0 then

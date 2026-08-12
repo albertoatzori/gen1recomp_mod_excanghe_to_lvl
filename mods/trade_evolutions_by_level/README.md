@@ -37,6 +37,12 @@ Both are read when the mod loads, so a change takes effect on the next boot.
 | `EVOLVE AT` | 36 | the level the converted evolutions fire at (2–100) |
 | `TRADING STILL EVOLVES` | on | keep the original trade route alongside the new level one; turn it off to make the cable stop evolving these lines |
 
+`EVOLVE AT` is read **at the moment the game checks for an evolution**, so
+the number on the settings screen is always the number in force — change it
+and the next level-up already uses it, with no restart. `TRADING STILL
+EVOLVES` shapes the merged evolution rows instead, so that one takes effect
+on the next boot.
+
 The two routes never collide: a level row can only fire on a level-up and a
 trade row can only fire on a trade.
 
@@ -47,6 +53,19 @@ evolution to a mon that gained a level in the battle that just ended
 (`EvolveAfterBattle`), so a HAUNTER you caught at level 40 waits until it
 levels to 41 — or until a Rare Candy does it. That is how every level
 evolution behaves in the original, not something this mod adds.
+
+**The sweep runs once per battle, not once per level.** If a Pokemon crosses
+36 *inside* a battle and keeps going — routine with an exp multiplier — you
+see "grew to level 36!", "37!", "38!" one after another and it evolves when
+the battle ends, as a 38. It looks like 36 and 37 were ignored; they were
+not. The threshold decided *that* it evolves, and the battle decided *when*
+the game got a chance to say so. Vanilla does the same with a BULBASAUR that
+crosses 16 mid-fight.
+
+**A B press during the animation stops it**, exactly as it does for any other
+level evolution, and prints "Huh? ... stopped evolving!". The next offer then
+waits for the next level-up. A real trade evolution cannot be refused; this
+one can, because it is now a level evolution.
 
 **On Gold an Everstone still stops it**, and using an evolution stone on a
 converted species does not trip the new level row either: both gates are

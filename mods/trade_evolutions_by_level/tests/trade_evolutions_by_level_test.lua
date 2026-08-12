@@ -16,6 +16,7 @@ local T = require("tests.modkit")
 local FsIo = require("tests.fs_io")
 local SaveSerializer = require("src.core.SaveSerializer")
 local Evolution = require("src.pokemon.Evolution")
+local Experience = require("src.battle.Experience")
 
 local MOD = "mods/trade_evolutions_by_level"
 
@@ -124,6 +125,62 @@ T.eq(mon.species, "FIXMON_C", "the mon became the evolved species")
 T.check(mon.stats.hp > 0, "with stats recalculated for it")
 T.check(game.save.pokedex.owned.FIXMON_C, "and the dex records it as owned")
 
+-- ------- crossing the level mid-battle
+--
+-- Gen 1 sweeps for evolutions ONCE, after the battle ends, on whatever level
+-- the mon finished with -- it does not re-check at each level crossed.  So a
+-- mon that jumps 35 -> 39 inside one fight (what an exp multiplier makes
+-- routine) prints a "grew to level" box for 36, 37, 38 and 39 and only then
+-- evolves, as a 39.  That reads like "it ignored 36", which is why it is
+-- pinned here: the threshold is honoured, the offer is just not per level.
+
+local Growth = require("src.pokemon.Growth")
+local jumper = { species = "FIXMON_B", level = 35, hp = 50,
+                 stats = { hp = 50 }, dvs = {}, statExp = {} }
+jumper.exp = Growth.expForLevel(data.pokemon.FIXMON_B.growthRate, 35,
+                                data.growth_rates)
+
+-- one trainer battle, its six mons knocked out in turn: the payouts land
+-- during the fight, the evolution sweep only runs once it is over
+local strong = { baseExp = 250, baseStats = data.pokemon.FIXMON_B.baseStats }
+local crossed = {}
+for _ = 1, 6 do
+  for _, level in ipairs(Experience.apply(data, jumper, strong, 100, true, 1, false)) do
+    crossed[#crossed + 1] = level
+  end
+end
+T.check(#crossed > 1, "the battle crossed several levels (" ..
+  table.concat(crossed, ", ") .. ")")
+T.eq(crossed[1], 36, "the threshold went by mid-battle, with no offer of its own")
+T.check(jumper.level > 36, "and ended well past the threshold")
+T.eq((Evolution.pendingFor(game, jumper, { kind = "levelup" })), "FIXMON_C",
+  "the after-battle sweep still evolves it")
+
+-- ------- the settings screen and the game can never disagree
+--
+-- The manager writes a changed option straight into the live loader, which
+-- is what mod.options:get reads.  If the mod snapshotted the level at boot,
+-- it would keep enforcing the boot value while the settings screen showed
+-- the new one -- a mon that "should evolve at 36" quietly waiting for some
+-- other number, with nothing on screen to explain it.
+
+run.loader.modOptions = run.loader.modOptions or {}
+run.loader.modOptions.trade_evolutions_by_level = { level = 40 }
+
+T.eq(pending(36, "levelup"), nil, "raising the setting to 40 holds it at 36")
+T.eq(pending(39, "levelup"), nil, "and at 39")
+T.eq(pending(40, "levelup"), "FIXMON_C", "and evolves at 40, with no reload")
+
+run.loader.modOptions.trade_evolutions_by_level = { level = 20 }
+T.eq(pending(20, "levelup"), "FIXMON_C", "lowering it to 20 evolves at 20")
+T.eq(pending(19, "levelup"), nil, "but not at 19")
+
+-- the kept trade row is not answered by the mod, so it still behaves
+T.eq(pending(5, "trade"), "FIXMON_C", "and a trade still evolves it at any level")
+
+run.loader.modOptions.trade_evolutions_by_level = nil
+T.eq(pending(36, "levelup"), "FIXMON_C", "back to the default, 36 evolves again")
+
 run.release()
 
 -- ------- options: a different level, and trading switched off
@@ -199,11 +256,14 @@ local gold = {
   },
 }
 
-local logged = {}
+local logged, goldHook = {}, {}
 entry({
   -- nil for every key: the stub has no stored values, so the entry chunk
   -- falls back to its own defaults exactly as it does on a fresh install
   options = { define = function() end, get = function() return nil end },
+  -- the entry chunk registers its live-level guard here; captured so the
+  -- Gold rows below can be run through it the way the engine would
+  hooks = { wrap = function(_, name, fn) goldHook[name] = fn end },
   content = {
     pokemon = {
       each = function()
@@ -260,5 +320,30 @@ T.eq(goldPending(5, { link = true }, "METAL_COAT"), "EVOLVE_TRADE",
   "and the Metal Coat trade still evolves it")
 T.eq(goldPending(36, { force = true, item = "FIRE_STONE" }), nil,
   "using a stone does not trip the new level row")
+
+-- and the live-level guard on Gold's own signature: no `kind` on the
+-- context, so the wrap has to recognise the after-battle sweep by the
+-- absence of a link and of a forced stone, and hand everything else back
+local guard = goldHook["evolution.check"]
+T.check(guard, "the entry chunk registered its evolution.check guard")
+
+local function guarded(level, ctx, held)
+  local delegated = false
+  local function vanilla() delegated = true return false end
+  local answer = guard(vanilla, { pokemon = gold },
+    { species = "ONIX", level = level, item = held },
+    gold.ONIX.evolutions[1], ctx or {})
+  return answer, delegated
+end
+
+T.eq((guarded(35, {})), false, "Gold: below the level the guard says no")
+T.eq((guarded(36, {})), true, "Gold: at the level it says yes")
+T.eq(select(2, guarded(36, {})), false, "and answered rather than delegating")
+T.eq(select(2, guarded(36, {}, "EVERSTONE")), true,
+  "an Everstone is handed back to the engine, which refuses it")
+T.eq(select(2, guarded(36, { link = true })), true,
+  "so is a trade in progress")
+T.eq(select(2, guarded(36, { force = true, item = "FIRE_STONE" })), true,
+  "and so is a stone being used")
 
 T.finish("trade_evolutions_by_level")
