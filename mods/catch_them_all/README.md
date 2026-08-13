@@ -5,9 +5,10 @@ can be finished without a second cartridge and a link cable.
 
 Works on Red/Blue/Yellow and on Gold.
 
-> **This mod ships inert.** One piece of what it needs cannot be computed, and
-> until it is supplied the mod adds nothing and says so in the log. See
-> [What is still missing](#what-is-still-missing).
+> **Gen 1 is ready; Gold is not yet.** The one list that cannot be computed is
+> filled for Red/Blue/Yellow, read out of the ported map scripts. The Gen 2
+> list is still empty, so on Gold the mod adds nothing and says so in the log.
+> See [The declared list](#the-declared-list).
 
 ## Options
 
@@ -55,23 +56,30 @@ levels above its neighbours. Placement is a stable hash of the species id, so
 the same dataset always produces the same world — which is what makes a
 surprise reportable rather than a shrug.
 
-## What is still missing
+## The declared list
 
-`obtainable.lua` is the list of species you can get **without** meeting them in
-the wild: starters, fossils, the Game Corner prizes, the in-game trades,
-Snorlax, the birds, Mewtwo. It ships **empty**.
+`obtainable.lua` names the species you can get **without** meeting them in the
+wild. For Gen 1 it holds 35 of them, and none was recalled: they were read out
+of `data/scripts/`, the map scripts this engine ports by hand rather than
+extracting from a cartridge —
 
-Left to guess, the mod would conclude that Charmander, Snorlax and Mewtwo are
-missing from your game and drop all three into the first patch of grass. So
-instead it fails closed: with an empty list it adds nothing at all and logs why.
+- `give_pokemon` rows and direct `Commands.give_pokemon` calls — the starters,
+  Pikachu, Eevee, Lapras, the Mt. Moon Magikarp;
+- `static_battle` rows — Snorlax, the three birds, Mewtwo;
+- the in-game trades, whose event flags name both sides
+  (`EVENT_TRADED_SPEAROW_FOR_FARFETCHD`);
+- the Game Corner prize tables, the Fighting Dojo balls, the fossil revivals.
 
-Filling it takes one imported game. The encounter tables, read together with
-the ported map scripts, say exactly which species arrive by gift, by static
-battle or by trade. The list is a union across versions — a species that is
+Every id was then checked against the 151 the version manifest lists. **Vulpix
+is in there** because it is a Game Corner prize — precisely the sort of thing
+memory gets wrong, and the reason this list was extracted instead of written
+from knowledge.
+
+The list is a union across versions, which is the safe shape: a species that is
 wild in *your* version is already found through the encounter tables, so
-listing it can only ever make the mod more conservative, never wrong in the
-dangerous direction. Ids absent from the running dataset are ignored, so an
-over-long list is harmless.
+listing it here can only make the mod more conservative, never wrong in the
+dangerous direction. Ids absent from the running dataset are ignored.
 
-Everything else — the scan, the evolution closure, the census, the placement,
-the safety rule — is built and tested. This is the last twenty lines.
+**Gold's list is still empty**, so the mod fails closed there — it adds nothing
+and logs why. Gen 2's gifts and statics live in its own ported scripts and can
+be extracted the same way.

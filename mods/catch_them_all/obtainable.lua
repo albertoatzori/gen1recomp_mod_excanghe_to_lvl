@@ -37,8 +37,25 @@
 -- list is harmless.
 
 return {
-  -- Gen 1: Red, Blue, Yellow
-  gen1 = {},
+  -- Gen 1: Red, Blue, Yellow.  Extracted from the ported map scripts in
+  -- data/scripts/ -- `give_pokemon` rows and direct Commands.give_pokemon
+  -- calls, `static_battle` rows, the in-game trades (whose event flag names
+  -- both sides: EVENT_TRADED_SPEAROW_FOR_FARFETCHD), the Game Corner prize
+  -- tables, the Fighting Dojo balls and the fossil revivals -- then checked
+  -- against the 151 species the version manifest lists.  Read out of the
+  -- source, not recalled: VULPIX is here because it is a Game Corner prize,
+  -- which is exactly the sort of thing memory gets wrong.
+  gen1 = {
+    "ABRA", "AERODACTYL", "ARTICUNO", "BULBASAUR",
+    "CHARMANDER", "CLEFAIRY", "DRATINI", "EEVEE",
+    "ELECTRODE", "FARFETCHD", "HITMONCHAN", "HITMONLEE",
+    "JYNX", "KABUTO", "LAPRAS", "LICKITUNG",
+    "MAGIKARP", "MEWTWO", "MOLTRES", "MR_MIME",
+    "NIDORAN_F", "NIDORINA", "NIDORINO", "OMANYTE",
+    "PIKACHU", "PINSIR", "PORYGON", "SCYTHER",
+    "SEEL", "SNORLAX", "SQUIRTLE", "TANGELA",
+    "VULPIX", "WIGGLYTUFF", "ZAPDOS",
+  },
 
   -- Gen 2: Gold
   gen2 = {},

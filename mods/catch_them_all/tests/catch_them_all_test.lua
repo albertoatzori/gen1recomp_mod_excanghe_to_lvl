@@ -212,4 +212,32 @@ end
 T.eq(count, 1, "at 1 AREA it takes exactly one slot")
 run.release()
 
+-- ------- the list the mod actually ships
+--
+-- The Gen 1 half was read out of data/scripts/ rather than recalled, and it
+-- is the one part of this mod that cannot be derived at load.  Emptying it
+-- would silently turn the mod off, so its shape is pinned here.
+
+local shipped = dofile("mods/catch_them_all/obtainable.lua")
+T.check(type(shipped) == "table" and type(shipped.gen1) == "table",
+  "obtainable.lua returns a table with a gen1 list")
+T.check(#shipped.gen1 > 30,
+  "the Gen 1 list is filled (" .. #shipped.gen1 .. " species)")
+
+local seen = {}
+for _, id in ipairs(shipped.gen1) do
+  T.check(type(id) == "string" and id:match("^[A-Z][A-Z_0-9]*$") ~= nil,
+    "every entry is a species id: " .. tostring(id))
+  T.eq(seen[id], nil, "and appears once: " .. tostring(id))
+  seen[id] = true
+end
+
+-- the three routes that motivated the file, each represented
+T.check(seen.SQUIRTLE, "a starter is declared (give_pokemon)")
+T.check(seen.SNORLAX, "a static battle is declared")
+T.check(seen.FARFETCHD, "an in-game trade is declared")
+T.check(seen.OMANYTE, "a fossil revival is declared")
+T.check(seen.VULPIX,
+  "and VULPIX, the Game Corner prize a from-memory list would have missed")
+
 T.finish("catch_them_all")
