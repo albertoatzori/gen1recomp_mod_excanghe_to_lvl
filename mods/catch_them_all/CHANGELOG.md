@@ -4,6 +4,32 @@ All notable changes to this mod are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-12
+
+### Changed
+
+- **Nothing is replaced any more.** The mod no longer rewrites encounter
+  tables. `encounter.roll` may force an encounter, so the engine rolls
+  first and the mod only answers the steps that came back empty. Every
+  vanilla species keeps every one of its encounters; the newcomers fill the
+  silence between them. The only thing that rises is how often you meet
+  anything at all.
+- Homes are declared in `homes.lua`, not derived from a hash. A species with
+  no home is reported and left alone rather than dropped somewhere plausible.
+- `HOW OFTEN` replaces `AREAS EACH`: the guest chance is a share of each
+  map's own encounter rate, so a quiet cave stays quiet.
+- Options are read at the moment of the step, so they apply immediately.
+
+### Added
+
+- `ALSO GIFTS AND TRADES` (on by default): the starters, fossils, Dojo pair,
+  trade-only four, Porygon, Eevee and Lapras are placed in the grass too, so
+  everything can be found by walking. Turning it off restores the narrower
+  "only what no route offers" reading.
+- Homes for the fifteen species no Gen 1 cartridge puts in any grass, each
+  with its reasoning recorded next to it.
+- A load-time warning when a home names a map with no wild encounters.
+
 ## [0.3.0] - 2026-08-12
 
 ### Added

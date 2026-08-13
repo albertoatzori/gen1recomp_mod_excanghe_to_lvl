@@ -1,25 +1,25 @@
 -- Standalone: luajit mods/catch_them_all/tests/catch_them_all_test.lua
 --
 -- ROM-free: the mod is loaded through the real headless loader against the
--- fixture dataset, and what is asserted is the MERGED encounter tables the
--- engine would then roll against -- so what is under test is the data
--- src/world/Encounter.lua will actually read.
+-- fixture dataset, and the placement is then measured through the hook the
+-- engine actually raises, with a scripted RNG -- so what is asserted is what
+-- a step in the grass does.
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.modkit")
 local FsIo = require("tests.fs_io")
 local SaveSerializer = require("src.core.SaveSerializer")
+local Runtime = require("src.mods.Runtime")
 
 local MOD = "mods/catch_them_all"
 
 -- Writes are dropped so no case leaves the loader's option-schema snapshot in
 -- the checkout, and the "mods" listing is narrowed to this mod so the other
--- committed mods stay out of the merge.  `obtainable` overrides the mod's own
--- data file, which is how a filled list is exercised without shipping one.
-local function checkoutFs(modOptions, obtainable)
+-- committed mods stay out of the merge.  `files` overrides the mod's own data
+-- files, which is how a case states its world in one place.
+local function checkoutFs(modOptions, files)
   local inner = FsIo.new(".")
   local body = modOptions and SaveSerializer.encode({ modOptions = modOptions })
-  local declared = obtainable and ("return " .. obtainable)
   local fs = {}
   for key, value in pairs(inner) do fs[key] = value end
   fs.getInfo = function(path)
@@ -31,7 +31,9 @@ local function checkoutFs(modOptions, obtainable)
   end
   fs.read = function(path)
     if path == "options.lua" then return body end
-    if declared and path:match("obtainable%.lua$") then return declared end
+    for name, source in pairs(files or {}) do
+      if path:match(name:gsub("%.", "%%.") .. "$") then return "return " .. source end
+    end
     return inner.read(path)
   end
   fs.getDirectoryItems = function(path)
@@ -42,115 +44,130 @@ local function checkoutFs(modOptions, obtainable)
   return fs
 end
 
-local SCRIPTED = '{ gen1 = { "FIXMON_A" } }'
-
--- The fixture route has two grass slots (FIXMON_A, FIXMON_C) out of three
--- species, so FIXMON_B is what nothing offers -- a version exclusive in
--- miniature.  A duplicate slot and a water table are added so there is one
--- slot the mod is allowed to spend and somewhere for habitat routing to go.
+-- FIXMON_B is in no encounter table, so it stands in for anything this
+-- version never offers.  The fixture evolves A into B, which would make B
+-- reachable; the closure case puts that back on purpose.
 local function dataset()
   local data = T.fixtures.fresh()
-  -- the fixture evolves FIXMON_A into FIXMON_B, which would make B reachable
-  -- and leave nothing missing; the case that tests the closure puts it back
   data.pokemon.FIXMON_A.evolutions = {}
-  data.encounters.FIX_ROUTE.grass.slots[3] = { level = 5, species = "FIXMON_A" }
   data.encounters.FIX_ROUTE.water = {
-    rate = 10, slots = { { level = 10, species = "FIXMON_A" },
-                         { level = 11, species = "FIXMON_A" } },
+    rate = 20, slots = { { level = 10, species = "FIXMON_A" } },
   }
   return data
 end
 
-local function slotsOf(data, map, terrain)
-  local out = {}
-  for _, slot in ipairs(data.encounters[map][terrain].slots) do
-    out[#out + 1] = slot.species
-  end
-  return table.concat(out, ",")
+local HOMES = '{ gen1 = { FIXMON_B = { { map = "FIX_ROUTE", terrain = "grass", min = 7, max = 9 } } } }'
+local NO_HOMES = "{ gen1 = {} }"
+local SCRIPTED = '{ gen1 = { "FIXMON_A" } }'
+
+local function load(opts, files)
+  return T.sdk.loadMods({ MOD },
+    { data = dataset(), fs = checkoutFs(opts, files) })
 end
 
-local function has(data, map, terrain, species)
-  for _, slot in ipairs(data.encounters[map][terrain].slots) do
-    if slot.species == species then return slot end
-  end
-  return nil
+-- One step in the grass.  `draws` feeds ctx.rng in order; `vanilla` is what
+-- the engine's own roll returned, nil for an empty step.
+local function step(vanilla, draws, terrain)
+  local i = 0
+  local encDef = { grass = { rate = 128, slots = { { level = 3, species = "FIXMON_A" } } } }
+  local ctx = {
+    mapId = "FIX_ROUTE", terrain = terrain or "grass",
+    rng = function() i = i + 1 return draws[i] or 0 end,
+  }
+  return Runtime.call("encounter.roll", function() return vanilla end, encDef, ctx)
 end
 
--- ------- fail closed: an empty obtainable.lua adds nothing at all
+local VANILLA = { species = "FIXMON_A", level = 3 }
+
+-- ------- nothing vanilla offers is ever taken away
+
+local run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
+T.eq(#run.errors, 0, "the mod loads clean")
+
+local enc = step(VANILLA, { 0.0 })
+T.eq(enc, VANILLA, "a step the engine filled is returned untouched")
+T.eq(enc.species, "FIXMON_A", "with the species the engine picked")
+
+-- ------- and an empty step can become a guest
+
+enc = step(nil, { 0.0, 0.0 })
+T.check(enc ~= nil, "an empty step can produce a guest")
+T.eq(enc.species, "FIXMON_B", "which is the species with a home here")
+T.check(enc.level >= 7 and enc.level <= 9,
+  "at a level from its home's range, got " .. tostring(enc and enc.level))
+
+-- ------- but only sometimes: the die is a share of the map's own rate
+
+enc = step(nil, { 0.99 })
+T.eq(enc, nil, "an unlucky empty step stays empty")
+
+-- rate 128/256 = 0.5, UNCOMMON = 0.25 -> the guest chance is 0.125
+enc = step(nil, { 0.124, 0.0 })
+T.check(enc ~= nil, "a draw just under the chance produces one")
+enc = step(nil, { 0.126 })
+T.eq(enc, nil, "a draw just over it does not")
+run.release()
+
+-- ------- HOW OFTEN moves that line, and nothing else
+
+run = load({ catch_them_all = { chance = 0.5 } },
+  { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
+T.check(step(nil, { 0.24, 0.0 }) ~= nil, "COMMON: a draw at 0.24 produces one")
+T.eq(step(nil, { 0.26 }), nil, "and 0.26 does not -- the line moved to 0.25")
+run.release()
+
+run = load({ catch_them_all = { chance = 0.1 } },
+  { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
+T.eq(step(nil, { 0.06 }), nil, "RARE: 0.06 no longer produces one")
+T.check(step(nil, { 0.04, 0.0 }) ~= nil, "but 0.04 still does")
+run.release()
+
+-- ------- a map with no home for anyone is untouched
+
+run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = NO_HOMES })
+T.eq(step(nil, { 0.0, 0.0 }), nil, "with no homes declared no step is filled")
+T.eq(step(VANILLA, { 0.0 }), VANILLA, "and vanilla still comes through")
+run.release()
+
+-- ------- the terrain has to match
+
+run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
+T.eq(step(nil, { 0.0, 0.0 }, "water"), nil,
+  "a grass home does not fill an empty step on the water")
+run.release()
+
+-- ------- gifts and trades are placed too, and the toggle takes them back
+
+local GIFT_HOME =
+  '{ gen1 = { FIXMON_A = { { map = "FIX_ROUTE", terrain = "grass", min = 4, max = 4 } } } }'
+
+-- FIXMON_A IS in the fixture's grass, so it is not missing and stays out
+run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = GIFT_HOME })
+T.eq(step(nil, { 0.0, 0.0 }), nil,
+  "a species already in this version's grass is never added again")
+run.release()
+
+-- ------- the evolution closure still holds
+
+run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
+local placedB = step(nil, { 0.0, 0.0 })
+T.check(placedB ~= nil, "FIXMON_B is placed when nothing reaches it")
+run.release()
 
 local data = dataset()
-local before = slotsOf(data, "FIX_ROUTE", "grass")
-local run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, "{}") })
-T.eq(#run.errors, 0, "an empty list is not a load error")
-T.eq(slotsOf(data, "FIX_ROUTE", "grass"), before,
-  "with nothing declared the mod adds nothing -- it cannot tell a version "
-  .. "exclusive from a starter")
-run.release()
-
--- ------- with the scripted species declared, the gap is filled
-
-data = dataset()
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-T.eq(#run.errors, 0, "a filled list loads clean")
-T.check(has(data, "FIX_ROUTE", "grass", "FIXMON_B") ~= nil,
-  "FIXMON_B, which nothing offered, is now catchable")
-run.release()
-
--- ------- it never takes the last copy of a species
-
-data = dataset()
-data.encounters.FIX_ROUTE.water = nil
-data.encounters.FIX_ROUTE.grass.slots = {
-  { level = 30, species = "FIXMON_A" },
-  { level = 31, species = "FIXMON_C" },
-  { level = 32, species = "FIXMON_A" },
-}
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-local slots = data.encounters.FIX_ROUTE.grass.slots
-T.eq(#slots, 3, "the table keeps its shape -- a slot's position is its odds")
-T.check(has(data, "FIX_ROUTE", "grass", "FIXMON_A") ~= nil,
-  "FIXMON_A keeps a slot: its duplicate was spent, never its last copy")
-T.check(has(data, "FIX_ROUTE", "grass", "FIXMON_C") ~= nil,
-  "FIXMON_C is untouched -- it only ever had the one")
-T.eq(slots[3].species, "FIXMON_B", "the rarest slot is the one given up")
-T.eq(slots[3].level, 32,
-  "and the newcomer inherits its level, so it fits the area")
-run.release()
-
--- ------- when every slot is a last copy, nothing is touched at all
-
-data = dataset()
-data.encounters.FIX_ROUTE.water = nil
-data.encounters.FIX_ROUTE.grass.slots = {
-  { level = 5, species = "FIXMON_A" }, { level = 6, species = "FIXMON_C" },
-}
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-T.eq(slotsOf(data, "FIX_ROUTE", "grass"), "FIXMON_A,FIXMON_C",
-  "with no duplicate anywhere the table is left exactly as it was")
-run.release()
-
--- ------- evolutions are followed, so an evolved form is not "missing"
-
-data = dataset()
 data.pokemon.FIXMON_A.evolutions = {
   { method = "LEVEL", level = 16, species = "FIXMON_B" },
 }
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-T.eq(has(data, "FIX_ROUTE", "grass", "FIXMON_B"), nil,
-  "a species reachable by evolving a wild one is left alone")
+run = T.sdk.loadMods({ MOD }, { data = data,
+  fs = checkoutFs(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES }) })
+T.eq(step(nil, { 0.0, 0.0 }), nil,
+  "but not when a wild species evolves into it")
 run.release()
 
--- ------- and a declared species is never treated as missing
+-- ------- legendaries stay out unless asked for
 
-data = dataset()
-run = T.sdk.loadMods({ MOD },
-  { data = data, fs = checkoutFs(nil, '{ gen1 = { "FIXMON_A", "FIXMON_B" } }') })
-T.eq(has(data, "FIX_ROUTE", "grass", "FIXMON_B"), nil,
-  "a species a script hands you is not put in the grass")
-run.release()
-
--- ------- legendaries are held back unless asked for
-
+local LEG_HOME =
+  '{ gen1 = { MEWTWO = { { map = "FIX_ROUTE", terrain = "grass", min = 30, max = 30 } } } }'
 local function withMewtwo()
   local d = dataset()
   d.pokemon.MEWTWO = { name = "MEWTWO", types = { "PSYCHIC" },
@@ -159,68 +176,39 @@ local function withMewtwo()
   return d
 end
 
-data = withMewtwo()
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-T.eq(has(data, "FIX_ROUTE", "grass", "MEWTWO"), nil,
-  "MEWTWO is not dropped into the grass by default")
-T.check(has(data, "FIX_ROUTE", "grass", "FIXMON_B") ~= nil,
-  "while the ordinary missing species still is")
+run = T.sdk.loadMods({ MOD }, { data = withMewtwo(),
+  fs = checkoutFs(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = LEG_HOME }) })
+T.eq(step(nil, { 0.0, 0.0 }), nil, "MEWTWO is not in the grass by default")
 run.release()
 
-data = withMewtwo()
-run = T.sdk.loadMods({ MOD },
-  { data = data, fs = checkoutFs({ catch_them_all = { legendaries = true } },
-                                 SCRIPTED) })
-T.check(has(data, "FIX_ROUTE", "grass", "MEWTWO") ~= nil
-        or has(data, "FIX_ROUTE", "water", "MEWTWO") ~= nil,
-  "and is, when the option asks for it")
+run = T.sdk.loadMods({ MOD }, { data = withMewtwo(),
+  fs = checkoutFs({ catch_them_all = { legendaries = true } },
+                  { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = LEG_HOME }) })
+local leg = step(nil, { 0.0, 0.0 })
+T.check(leg ~= nil and leg.species == "MEWTWO",
+  "and is when the option asks for it")
 run.release()
 
--- ------- Water types are routed to water where there is any
+-- ------- the encounter tables themselves are never rewritten
 
 data = dataset()
-data.pokemon.FIXMON_B.types = { "WATER" }
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
-T.check(has(data, "FIX_ROUTE", "water", "FIXMON_B") ~= nil,
-  "a Water type takes a slot in the water table")
-T.eq(has(data, "FIX_ROUTE", "grass", "FIXMON_B"), nil, "and not in the grass")
-run.release()
-
--- ------- the placement is derived, so two runs agree
-
-local function placement()
-  local d = dataset()
-  local r = T.sdk.loadMods({ MOD }, { data = d, fs = checkoutFs(nil, SCRIPTED) })
-  local where = slotsOf(d, "FIX_ROUTE", "grass") .. "|"
-    .. slotsOf(d, "FIX_ROUTE", "water")
-  r.release()
-  return where
+local before = {}
+for _, slot in ipairs(data.encounters.FIX_ROUTE.grass.slots) do
+  before[#before + 1] = slot.species
 end
-T.eq(placement(), placement(), "the same dataset always produces the same world")
-
--- ------- AREAS EACH bounds how many slots one species takes
-
-data = dataset()
-run = T.sdk.loadMods({ MOD },
-  { data = data, fs = checkoutFs({ catch_them_all = { homes = 1 } }, SCRIPTED) })
-local count = 0
-for _, terrain in ipairs({ "grass", "water" }) do
-  for _, slot in ipairs(data.encounters.FIX_ROUTE[terrain].slots) do
-    if slot.species == "FIXMON_B" then count = count + 1 end
-  end
+run = T.sdk.loadMods({ MOD }, { data = data,
+  fs = checkoutFs(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES }) })
+local after = {}
+for _, slot in ipairs(data.encounters.FIX_ROUTE.grass.slots) do
+  after[#after + 1] = slot.species
 end
-T.eq(count, 1, "at 1 AREA it takes exactly one slot")
+T.eq(table.concat(after, ","), table.concat(before, ","),
+  "no slot is added, removed or renamed -- the mod only answers steps")
 run.release()
 
--- ------- the report survives a save event with nowhere to write
---
--- Storage is scoped to a playthrough, so the report is written on a save
--- event rather than at load.  A headless run has no persistence backend and
--- no save, and the mod must simply not write rather than fail the boot.
+-- ------- a save event with nowhere to write is survivable
 
-local Runtime = require("src.mods.Runtime")
-data = dataset()
-run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
+run = load(nil, { ["obtainable.lua"] = SCRIPTED, ["homes.lua"] = HOMES })
 local ok, err = pcall(function()
   Runtime.emit("save.loaded", { game = { save = nil } })
   Runtime.emit("save.created", {})
@@ -229,32 +217,44 @@ T.check(ok, "a save event with no writable playthrough is survivable: "
   .. tostring(err))
 run.release()
 
--- ------- the list the mod actually ships
---
--- The Gen 1 half was read out of data/scripts/ rather than recalled, and it
--- is the one part of this mod that cannot be derived at load.  Emptying it
--- would silently turn the mod off, so its shape is pinned here.
+-- ------- the files the mod actually ships
 
-local shipped = dofile("mods/catch_them_all/obtainable.lua")
-T.check(type(shipped) == "table" and type(shipped.gen1) == "table",
-  "obtainable.lua returns a table with a gen1 list")
-T.check(#shipped.gen1 > 30,
-  "the Gen 1 list is filled (" .. #shipped.gen1 .. " species)")
+local homes = dofile("mods/catch_them_all/homes.lua")
+T.check(type(homes) == "table" and type(homes.gen1) == "table",
+  "homes.lua returns a table with a gen1 map")
 
-local seen = {}
-for _, id in ipairs(shipped.gen1) do
-  T.check(type(id) == "string" and id:match("^[A-Z][A-Z_0-9]*$") ~= nil,
-    "every entry is a species id: " .. tostring(id))
-  T.eq(seen[id], nil, "and appears once: " .. tostring(id))
-  seen[id] = true
+local count = 0
+for id, spots in pairs(homes.gen1) do
+  count = count + 1
+  T.check(id:match("^[A-Z][A-Z_0-9]*$") ~= nil, "a species id: " .. id)
+  T.check(#spots > 0, id .. " has at least one home")
+  for _, spot in ipairs(spots) do
+    T.check(type(spot.map) == "string" and spot.map:match("^[A-Z][A-Z_0-9]*$"),
+      id .. " names a map id: " .. tostring(spot.map))
+    T.check(spot.terrain == "grass" or spot.terrain == "water",
+      id .. " names a terrain the engine rolls: " .. tostring(spot.terrain))
+    T.check(type(spot.min) == "number" and type(spot.max) == "number"
+      and spot.min >= 2 and spot.max >= spot.min and spot.max <= 100,
+      id .. " has a sane level range")
+  end
+end
+T.check(count >= 14, "the nowhere-wild species are homed (" .. count .. ")")
+
+-- the map ids must be ones this engine knows
+local manifest = io.open("tools/rom_manifest_yellow.json")
+if manifest then
+  local body = manifest:read("*a")
+  manifest:close()
+  for id, spots in pairs(homes.gen1) do
+    for _, spot in ipairs(spots) do
+      T.check(body:find('"' .. spot.map .. '"', 1, true) ~= nil,
+        spot.map .. " (" .. id .. ") is a map the version manifest lists")
+    end
+  end
 end
 
--- the three routes that motivated the file, each represented
-T.check(seen.SQUIRTLE, "a starter is declared (give_pokemon)")
-T.check(seen.SNORLAX, "a static battle is declared")
-T.check(seen.FARFETCHD, "an in-game trade is declared")
-T.check(seen.OMANYTE, "a fossil revival is declared")
-T.check(seen.VULPIX,
-  "and VULPIX, the Game Corner prize a from-memory list would have missed")
+local declared = dofile("mods/catch_them_all/obtainable.lua")
+T.check(#declared.gen1 > 30,
+  "obtainable.lua still carries the declared list (" .. #declared.gen1 .. ")")
 
 T.finish("catch_them_all")

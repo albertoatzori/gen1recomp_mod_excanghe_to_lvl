@@ -14,47 +14,33 @@ Works on Red/Blue/Yellow and on Gold.
 
 | option | default | meaning |
 |---|---|---|
-| `AREAS EACH` | 2 AREAS | how many encounter slots one species is given, across the world |
-| `INCLUDE LEGENDARIES` | off | let Mewtwo, Mew, the birds and the Gen 2 legendaries be placed too |
+| `HOW OFTEN` | UNCOMMON | how likely a newcomer is, as a share of the map's own encounter rate: RARE (10%), UNCOMMON (25%), COMMON (50%) |
+| `ALSO GIFTS AND TRADES` | on | place the starters, fossils, Dojo pair, trade-only four, Porygon, Eevee and Lapras in the grass too |
+| `INCLUDE LEGENDARIES` | off | let Mewtwo, Mew, the birds and the Gen 2 legendaries be placed |
 
-These shape the merged encounter tables, so unlike this repo's other mods they
-take effect **on the next boot**, not immediately.
+All three are read **at the moment of the step**, so a change applies
+immediately.
 
-## How it decides what is missing
+## Nothing is replaced
 
-Two of the three ways a Pokémon reaches your party are data, and the mod reads
-them:
+The engine rolls first, and whatever it offers is returned untouched. The mod
+only answers the steps that came back **empty** — `encounter.roll` may force
+an encounter ("returns nil to suppress, a table without calling next to
+force"), so a newcomer fills the silence between vanilla encounters instead of
+taking someone's slot.
 
-- **the wild**, from the encounter tables — one entry per map, each with
-  grass/water sub-tables of `{species, level}` slots;
-- **evolution**, from each species' own evolution rows — anything that evolves
-  from something reachable is itself reachable, however long the chain.
+That matters because a slot's **position** is its probability —
+`src/world/Encounter.lua` walks the buckets and takes `slots[i]` — and the
+mod-facing schema exposes only `rate` and `slots`. The list cannot grow: an
+eleventh slot in a ten-bucket table would never be rolled. Rewriting a table
+always costs somebody their place, so this mod does not rewrite tables at all.
 
-The third is a **script**, and that is the problem: `give_pokemon`,
-`static_battle` and `trade` are calls *inside map script functions*
-(`src/script/Commands.lua`), not rows in a table. Lua cannot look inside a
-compiled function body, so no amount of cleverness at load time will find
-them.
+The price is the honest one: you meet *something* slightly more often. Every
+vanilla species keeps 100% of its own encounters.
 
-## How it adds them
-
-A slot's **position** in the list is its probability — `src/world/Encounter.lua`
-walks the buckets and takes `slots[i]` — and the mod-facing schema lets a table
-carry only `rate` and `slots`; `buckets` is engine-side. So the list cannot
-simply grow: an eleventh slot in a ten-bucket table would never be rolled. A
-species therefore **takes** a slot rather than being appended.
-
-Which slot is the whole point. Wild tables repeat species across their slots
-and across maps, so the mod counts every occurrence in the dataset first and
-**will only ever overwrite a slot whose species still has another one left**.
-A mod that exists to make Pokémon obtainable must not make one unobtainable on
-the way. If no slot can be spared, it takes none and says so.
-
-The rarest slots go first, so the encounters an area is known for stay put. The
-newcomer inherits the level of the slot it took, so nothing turns up forty
-levels above its neighbours. Placement is a stable hash of the species id, so
-the same dataset always produces the same world — which is what makes a
-surprise reportable rather than a shrug.
+The guest chance is a share of each map's own rate, not a flat number, so a
+cave that rolls rarely stays rare and a route that rolls often gets
+proportionally more.
 
 ## Seeing what it did
 
@@ -62,8 +48,8 @@ The placement is derived from your own encounter tables, so only your game
 knows the answer. The mod therefore reports it two ways:
 
 - **In the log**, one line per placement:
-  `VULPIX -- Route 4 (grass), level 8, in place of ZUBAT`. Visible if you
-  launch from a terminal.
+  `LAPRAS -- Seafoam Islands B4F (water), levels 30-38, normally a gift`.
+  Visible if you launch from a terminal.
 - **In a file**, for everyone else. On the first save event of a playthrough
   the mod writes the whole table into its own storage, under
   `mod_storage/<version>/<playthrough>/catch_them_all/report.lua` inside the
@@ -72,7 +58,29 @@ knows the answer. The mod therefore reports it two ways:
   - macOS `~/Library/Application Support/LOVE/pokemon-love2d/`
   - Linux `~/.local/share/love/pokemon-love2d/`
 
-  Each row carries `species`, `place`, `terrain`, `level` and `instead_of`.
+  Each row carries `species`, `place`, `terrain`, `min`, `max` and
+  `normally` (whether the species is a version exclusive or something a gift,
+  trade or event normally hands over).
+
+## Where they go
+
+`homes.lua` says which map, which terrain and which levels, per species, and
+it holds two different kinds of claim:
+
+**Version exclusives** — species Yellow drops but another Gen 1 cartridge puts
+in the grass. Their homes are *facts*, copied from that cartridge's own
+encounter tables, so they turn up on the same route, in the same terrain, at
+the same levels a player of that version would meet them.
+
+**Nowhere-wild species** — the starters, the fossils, the Dojo pair, the
+trade-only four, Porygon, Eevee, Lapras. No cartridge puts these in any grass,
+so there is no fact to copy and the home is a *design choice*, with its
+reasoning recorded beside it. Disagreeing with one is disagreeing with a
+judgement, not finding a bug — edit the row.
+
+Nothing is hashed or invented: a missing species with no declared home is
+reported at load and left alone. A home naming a map with no wild encounters
+is reported too, rather than silently never happening.
 
 ## The declared list
 
