@@ -212,6 +212,23 @@ end
 T.eq(count, 1, "at 1 AREA it takes exactly one slot")
 run.release()
 
+-- ------- the report survives a save event with nowhere to write
+--
+-- Storage is scoped to a playthrough, so the report is written on a save
+-- event rather than at load.  A headless run has no persistence backend and
+-- no save, and the mod must simply not write rather than fail the boot.
+
+local Runtime = require("src.mods.Runtime")
+data = dataset()
+run = T.sdk.loadMods({ MOD }, { data = data, fs = checkoutFs(nil, SCRIPTED) })
+local ok, err = pcall(function()
+  Runtime.emit("save.loaded", { game = { save = nil } })
+  Runtime.emit("save.created", {})
+end)
+T.check(ok, "a save event with no writable playthrough is survivable: "
+  .. tostring(err))
+run.release()
+
 -- ------- the list the mod actually ships
 --
 -- The Gen 1 half was read out of data/scripts/ rather than recalled, and it

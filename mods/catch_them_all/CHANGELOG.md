@@ -4,6 +4,17 @@ All notable changes to this mod are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-12
+
+### Added
+
+- A placement report. The mod now records every placement it makes -- which
+  species, in which area and terrain, at what level, in place of which
+  Pokemon -- logs it line by line, and writes it into the playthrough's mod
+  storage under `report` on the first save event. Nothing could read that
+  table out of the merged data afterwards, and a packaged build shows no
+  log, so there was no way to see what the mod had done.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added

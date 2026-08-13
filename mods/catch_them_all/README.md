@@ -56,6 +56,24 @@ levels above its neighbours. Placement is a stable hash of the species id, so
 the same dataset always produces the same world — which is what makes a
 surprise reportable rather than a shrug.
 
+## Seeing what it did
+
+The placement is derived from your own encounter tables, so only your game
+knows the answer. The mod therefore reports it two ways:
+
+- **In the log**, one line per placement:
+  `VULPIX -- Route 4 (grass), level 8, in place of ZUBAT`. Visible if you
+  launch from a terminal.
+- **In a file**, for everyone else. On the first save event of a playthrough
+  the mod writes the whole table into its own storage, under
+  `mod_storage/<version>/<playthrough>/catch_them_all/report.lua` inside the
+  game's save folder:
+  - Windows `%APPDATA%\LOVE\pokemon-love2d\`
+  - macOS `~/Library/Application Support/LOVE/pokemon-love2d/`
+  - Linux `~/.local/share/love/pokemon-love2d/`
+
+  Each row carries `species`, `place`, `terrain`, `level` and `instead_of`.
+
 ## The declared list
 
 `obtainable.lua` names the species you can get **without** meeting them in the

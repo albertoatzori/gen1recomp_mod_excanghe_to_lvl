@@ -203,6 +203,11 @@ return function(mod)
 
   -- ------- give them homes
 
+  -- every placement, kept so the mod can hand back the table it just made:
+  -- which species, where, in place of what.  Nobody can read this out of the
+  -- merged data afterwards, and a player cannot see the log at all in a
+  -- packaged build, so it is written to storage as a report below.
+  local report = {}
   local placed = {}
   for _, id in ipairs(missing) do
     local def = mod.content.pokemon:get(id)
@@ -238,9 +243,20 @@ return function(mod)
             end
           end
           if victim then
-            census[slots[victim].species] = census[slots[victim].species] - 1
+            local replaced = slots[victim].species
+            census[replaced] = census[replaced] - 1
             slots[victim] = { species = id, level = slots[victim].level }
             census[id] = (census[id] or 0) + 1
+
+            local mapDef = mod.content.maps and mod.content.maps:get(home.map)
+            report[#report + 1] = {
+              species = id,
+              map = home.map,
+              place = (mapDef and (mapDef.label or mapDef.name)) or home.map,
+              terrain = home.terrain,
+              level = slots[victim].level,
+              instead_of = replaced,
+            }
 
             local patch = {}
             for name, value in pairs(encDef) do patch[name] = value end
@@ -262,8 +278,36 @@ return function(mod)
   if #placed == 0 then
     mod.log:warn("%d species are missing but none could be placed: every "
       .. "encounter slot holds the last copy of its species", #missing)
-  else
-    mod.log:info("%d species now appear in the wild (up to %d area(s) each): %s",
-      #placed, homes, table.concat(placed, ", "))
+    return
   end
+
+  mod.log:info("%d species now appear in the wild (up to %d area(s) each): %s",
+    #placed, homes, table.concat(placed, ", "))
+  -- the same table, one line each, for anyone watching a terminal
+  for _, row in ipairs(report) do
+    mod.log:info("  %s -- %s (%s), level %d, in place of %s",
+      row.species, row.place, row.terrain, row.level, row.instead_of)
+  end
+
+  -- And for everyone else.  A packaged build shows no log, so the report is
+  -- written into the mod's own storage the first time a playthrough is open:
+  -- storage is scoped to a save, so it cannot be written at load time.
+  local written = false
+  local function writeReport(payload)
+    if written then return end
+    local game = (payload and payload.game) or mod.game
+    if not game then return end
+    local ok = mod.storage:write(game, "report", {
+      generated_for = isGen2 and "gen2" or "gen1",
+      areas_each = homes,
+      placements = report,
+    })
+    if ok then
+      written = true
+      mod.log:info("wrote the placement report to this playthrough's storage")
+    end
+  end
+  mod.events:on("save.loaded", writeReport)
+  mod.events:on("save.created", writeReport)
+  mod.events:on("map.entered", writeReport)
 end
