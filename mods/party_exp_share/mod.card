@@ -1,0 +1,28 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "The whole party gains exp, not just the Pokemon that fought.",
+  author = "albertoatzori",
+  contact = "https://github.com/albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  tags = { "balance", "exp", "quality-of-life", "beginner" },
+  differences = {
+    changed = {
+      "every non-fainted party member is paid after a battle, on Red and on Gold",
+      "the fighters keep their exact vanilla share",
+      "Red's EXP.ALL is superseded: holding it changes nothing while this is on",
+    },
+    added = {
+      "BENCH GETS option: FULL, HALF or QUARTER of a fighter's share",
+      "EXP MESSAGES option: announce every Pokemon, or only the fighters",
+    },
+    known = {
+      "fainted Pokemon are skipped, as vanilla's own EXP.ALL pass does",
+      "level-ups always announce, even on the quiet setting",
+      "pairs with exp_multiplier: that scales each share, this decides who gets one",
+    },
+  },
+  credits = {
+    { who = "pret/pokered", for_ = "the experience.asm split this replaces" },
+  },
+  compat = { engine = ">=0.0.0-dev <1.0.0", modApi = 2 },
+}

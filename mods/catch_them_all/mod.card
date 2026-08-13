@@ -1,0 +1,27 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "Version exclusives and other unobtainables get a wild home.",
+  author = "albertoatzori",
+  contact = "https://github.com/albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  tags = { "tweak", "encounters", "pokedex", "no-trading" },
+  differences = {
+    changed = {
+      "encounter tables gain a slot for each species the version never offers",
+      "vanilla slots keep their relative shares; none is removed or replaced",
+    },
+    added = {
+      "HOW OFTEN, AREAS EACH and INCLUDE LEGENDARIES options",
+    },
+    known = {
+      "obtainable.lua ships EMPTY and the mod adds nothing until it is filled",
+      "gifts, static battles and in-game trades live in script functions, so",
+      "they cannot be discovered at load -- that file is where they are declared",
+      "options shape the merged tables, so they take effect on the next boot",
+    },
+  },
+  credits = {
+    { who = "pret/pokered", for_ = "the wild_encounters.asm slot buckets" },
+  },
+  compat = { engine = ">=0.0.0-dev <1.0.0", modApi = 2 },
+}

@@ -1,0 +1,4 @@
+# Kept out of the packaged archive: the suite requires engine modules
+# (tests.modkit, src.mods.Runtime), which is a private-require finding
+# against a shipped mod and `pack` treats warnings as fatal.
+tests/catch_them_all_test.lua

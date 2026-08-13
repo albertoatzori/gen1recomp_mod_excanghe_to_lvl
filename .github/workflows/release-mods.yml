@@ -1,0 +1,177 @@
+name: release mods
+
+# Publishes each committed mod as an installable .zip GitHub Release.
+#
+# Adapted from `python3 tools/modkit.py add-release-workflow`, which writes a
+# workflow for a mod that OWNS its repository: it releases on a push to main,
+# tags plain vX.Y.Z, and fails when the tag already exists because in that
+# layout a release run means you meant to release.
+#
+# This repo holds several mods at once, so three things change:
+#   * the trigger is a push to dev (there is no main here) touching mods/,
+#   * tags carry the mod id -- trade_evolutions_by_level-v1.0.1 -- because two
+#     mods cannot share one vX.Y.Z namespace,
+#   * a version that is already released SKIPS instead of failing.  Every push
+#     under mods/ runs both jobs, and the mod you did not touch has nothing to
+#     publish; that is the normal case, not an error.
+#
+# So the way to cut a release is to bump "version" in that mod's manifest.json
+# (and add a CHANGELOG entry) and merge to dev.  Nothing else to remember.
+#
+# Packing is tools/modkit.py pack, the same command used by hand, so a release
+# archive is byte-for-byte what a local pack produces: reproducible, mod files
+# at the archive root, tests and scratch files excluded.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'mods/**'
+      - '.github/workflows/release-mods.yml'
+  workflow_dispatch:
+    inputs:
+      mod:
+        description: "Only this mod id (blank = every mod)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-mods
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mod: [trade_evolutions_by_level, exp_multiplier, party_exp_share, encounter_rate,
+             catch_them_all]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # modkit's MK305 dump check key-diffs shipped tables through luajit, and
+      # a missing interpreter is a fatal MK100 rather than a skipped check
+      - name: install luajit
+        run: sudo apt-get update && sudo apt-get install -y luajit
+
+      - name: Read the manifest version
+        id: ver
+        env:
+          MOD: ${{ matrix.mod }}
+          ONLY: ${{ github.event.inputs.mod }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ONLY:-}" ] && [ "${ONLY}" != "${MOD}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Not the requested mod; skipping."
+            exit 0
+          fi
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os, re, sys
+
+          mod = os.environ["MOD"]
+          with open(f"mods/{mod}/manifest.json", encoding="utf-8") as fh:
+              version = str(json.load(fh).get("version", ""))
+          if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+              print(f"::error::{mod} manifest version {version!r} is not X.Y.Z", file=sys.stderr)
+              raise SystemExit(1)
+          print(f"version={version}")
+          print(f"tag={mod}-v{version}")
+          PY
+
+      # A version already published is the ordinary outcome for the mod this
+      # push did not touch, so it ends the job quietly rather than red.
+      - name: Skip a version that is already released
+        id: gate
+        if: steps.ver.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists; nothing to publish."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate and lint before packing
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          MOD: ${{ matrix.mod }}
+        run: |
+          set -euo pipefail
+          python3 tools/modkit.py validate "mods/$MOD"
+          python3 tools/modkit.py lint "mods/$MOD"
+
+      - name: Pack the mod
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          MOD: ${{ matrix.mod }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 tools/modkit.py pack "mods/$MOD" -o "dist/${MOD}-${VERSION}.zip"
+
+          # the game reads manifest.json from the archive root; prove it is
+          # there and reports the version this release is named for
+          unzip -p "dist/${MOD}-${VERSION}.zip" manifest.json > packed.json
+          python3 - "$VERSION" <<'PY'
+          import json, sys
+          version = json.load(open("packed.json", encoding="utf-8"))["version"]
+          if version != sys.argv[1]:
+              raise SystemExit(f"::error::packed manifest says {version}, expected {sys.argv[1]}")
+          print(f"manifest.json at the archive root reports {version}")
+          PY
+
+          (cd dist && sha256sum "${MOD}-${VERSION}.zip" > "${MOD}-${VERSION}.sha256")
+          cat "dist/${MOD}-${VERSION}.sha256"
+
+      - name: Publish the release
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MOD: ${{ matrix.mod }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # the changelog section for this version, when the mod keeps one
+          notes_body="$(python3 - <<'PY'
+          import os, re
+          mod, version = os.environ["MOD"], os.environ["VERSION"]
+          try:
+              text = open(f"mods/{mod}/CHANGELOG.md", encoding="utf-8").read()
+          except OSError:
+              raise SystemExit
+          block = re.search(
+              rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)",
+              text, re.M | re.S)
+          if block:
+              print(block.group(1).strip())
+          PY
+          )"
+
+          notes="Download the .zip and install it in the game: MODS > Import mod .zip."
+          if [ -n "$notes_body" ]; then
+            notes="${notes}"$'\n\n'"${notes_body}"
+          fi
+
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$MOD $VERSION" \
+            --notes "$notes" \
+            "dist/${MOD}-${VERSION}.zip" \
+            "dist/${MOD}-${VERSION}.sha256"
+
+          echo "Published $TAG"

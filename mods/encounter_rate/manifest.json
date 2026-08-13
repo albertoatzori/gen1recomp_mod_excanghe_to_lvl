@@ -1,0 +1,20 @@
+{
+  "id": "encounter_rate",
+  "name": "Wild Encounter Rate",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "github": "albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  "game_version": ">=0.0.0-dev <1.0.0",
+  "category": "TWEAK",
+  "priority": 100,
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "incompatible": [],
+  "games": ["gen1", "gen2"],
+  "affects_link": false,
+  "experimental": false,
+  "description": "Thin wild encounters to half, a quarter, or none at all."
+}

@@ -59,14 +59,20 @@ check(#violations == 0,
     .. (#violations > 0 and (":\n  " .. table.concat(violations, "\n  ")) or ""))
 
 -- --------------------------------------------------------- replay the guard
--- Run build_android.sh's own forbidden-content pattern, in the captured
--- form the script now uses, over a throwaway archive that really does
--- carry a data/generated entry, and over a clean one.  This pins the
+-- Run the packagers' forbidden-content pattern, in the captured form the
+-- scripts use, over a throwaway archive that really does carry a
+-- data/generated entry, and over a clean one.  This pins the
 -- capture-then-grep idiom's behavior rather than trusting the scan alone.
-local androidBody = readFile("scripts/build_android.sh") or ""
-local pattern = androidBody:match("grep %-Eq '([^']*generated[^']*)'")
-check(pattern ~= nil,
-  "build_android.sh still greps a generated-data pattern over the listing")
+-- The pattern is read from whichever packager still ships it (the mobile
+-- and console packagers were dropped with their port trees); the literal
+-- below is the fallback so the replay still runs on a checkout with none.
+local pattern
+for _, script in ipairs(scripts) do
+  local body = readFile(script) or ""
+  pattern = pattern or body:match("grep %-Eq '([^']*generated[^']*)'")
+end
+pattern = pattern or "(^|/)data/generated/"
+check(pattern ~= nil, "a generated-data pattern is available to replay")
 
 local function haveCommand(name)
   local probe = io.popen("command -v " .. name .. " 2>/dev/null")
