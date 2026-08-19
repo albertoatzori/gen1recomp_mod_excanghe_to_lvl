@@ -1,0 +1,12 @@
+-- La griglia di lettere della schermata "dai un nome".
+--
+-- Vuoto di proposito: l'alfabeto inglese contiene gia' tutte le lettere
+-- che servono a scrivere un nome italiano, e nei giochi originali le
+-- accentate si scrivono senza accento anche in italiano.
+--
+-- Se un giorno vuoi una griglia diversa, ogni voce e' una riga di celle;
+-- una cella e' la sequenza che la tua charmap mappa, quindi un carattere
+-- multibyte resta una cella sola.  La riga con la sola cella
+-- "lower case" / "UPPER CASE" e' il cambio maiuscole/minuscole, e la
+-- cella "ED" e' la conferma: vanno tenute entrambe.
+return {}
