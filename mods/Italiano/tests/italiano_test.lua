@@ -18,11 +18,18 @@ local MOD = "mods/Italiano"
 --
 -- Letti direttamente perche' le asserzioni sulle direttive vanno fatte
 -- sulla coppia chiave/valore: dopo il merge la chiave non c'e' piu'.
-local function catalog(name)
+-- `optional` vale per i cataloghi che possono legittimamente mancare:
+-- main.lua fa ripiegare catalog() su {} quando mod:read non trova il file,
+-- quindi un catalogo assente e' un catalogo vuoto, non un errore.  E' il
+-- caso di font.lua, che non viene spedito perche' senza pagine di glifi da
+-- aggiungere sarebbe una tabella vuota.
+local function catalog(name, optional)
   local path = MOD .. "/lang/" .. name .. ".lua"
   local handle = io.open(path, "r")
-  T.check(handle ~= nil, name .. ".lua esiste")
-  if not handle then return {} end
+  if not handle then
+    T.check(optional, name .. ".lua esiste (o e' dichiarato opzionale)")
+    return {}
+  end
   local body = handle:read("*a")
   handle:close()
   local chunk, err = loadstring(body, path)
@@ -35,10 +42,18 @@ end
 
 local CATALOGS = { "dialogue", "strings", "species_names", "move_names",
                    "item_names", "trainer_names", "status_labels",
-                   "font", "charmap", "naming" }
+                   "charmap", "naming" }
+local OPTIONAL = { font = true }
 
 local loaded = {}
 for _, name in ipairs(CATALOGS) do loaded[name] = catalog(name) end
+for name in pairs(OPTIONAL) do loaded[name] = catalog(name, true) end
+
+-- Un catalogo opzionale assente deve comportarsi da vuoto, non far saltare
+-- il caricamento: e' la stessa garanzia su cui si regge main.lua.
+for name in pairs(OPTIONAL) do
+  T.eq(next(loaded[name]), nil, name .. " assente vale come catalogo vuoto")
+end
 
 -- ------------------------------------------- direttive e marcatori intatti
 --

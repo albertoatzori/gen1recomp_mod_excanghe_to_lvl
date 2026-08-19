@@ -9,7 +9,7 @@ tipi stanno in posti diversi per un motivo preciso.
 | `strings.lua` | testo scritto dall'engine: menu, lotta, launcher, rete | la frase inglese sorgente |
 | `species_names.lua` `move_names.lua` `item_names.lua` `trainer_names.lua` | nomi | l'id vanilla |
 | `status_labels.lua` | DOR, CON, AVV... come appaiono nel riquadro PS | l'id dello stato |
-| `font.lua` `charmap.lua` | il foglio di glifi e cosa disegna cosa | vedi sotto |
+| `charmap.lua` (e `font.lua`, da rigenerare) | il foglio di glifi e cosa disegna cosa | vedi sotto |
 | `naming.lua` | la griglia per inserire i nomi | - |
 
 Riempi un valore e ha effetto al boot successivo. Lascialo `""` e quella

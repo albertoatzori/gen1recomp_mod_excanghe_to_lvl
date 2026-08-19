@@ -63,8 +63,11 @@ che e' come si scrive in italiano quando il maiuscolo accentato non e'
 disponibile, ed e' anche piu' stretto nei menu.
 
 Per tornare al font a tile disegnato a mano: togli la riga
-`mod.content.font:register("ttf", {})` da `main.lua` e riempi
-`lang/font.lua` e `lang/charmap.lua`.
+`mod.content.font:register("ttf", {})` da `main.lua`, poi descrivi la
+pagina di glifi in `lang/font.lua` e le sequenze in `lang/charmap.lua`.
+`lang/font.lua` non e' nel pacchetto perche' senza pagine da aggiungere
+sarebbe una tabella vuota; lo ricrea `modkit translation Italiano
+--refresh`, e `main.lua` lo raccoglie da solo appena esiste.
 
 ## Gioco in rete
 

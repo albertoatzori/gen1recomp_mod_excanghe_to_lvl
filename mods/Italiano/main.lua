@@ -62,6 +62,10 @@ return function(mod)
   -- Pagine di glifi aggiuntive, se un giorno si vuole il look disegnato a
   -- mano al posto del TTF.  base e' il primo codice posseduto dalla
   -- pagina; da 0x100 in su e' spazio libero sopra le pagine vanilla.
+  -- lang/font.lua non c'e': senza pagine da aggiungere sarebbe una tabella
+  -- vuota, e un catalogo assente vale come vuoto (catalog() ripiega su {}).
+  -- Lo ricrea `modkit translation Italiano --refresh`, e questo ciclo lo
+  -- raccoglie da solo appena esiste.
   for id, page in pairs(catalog("font")) do
     mod.content.font:register(id, page)
   end
