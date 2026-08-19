@@ -42,7 +42,7 @@ end
 
 local CATALOGS = { "dialogue", "strings", "species_names", "move_names",
                    "item_names", "trainer_names", "status_labels",
-                   "charmap", "naming" }
+                   "location_names", "charmap", "naming" }
 local OPTIONAL = { font = true }
 
 local loaded = {}
@@ -163,7 +163,7 @@ for source, italian in pairs(loaded.strings) do
   end
 end
 for _, name in ipairs({ "item_names", "move_names", "trainer_names",
-                        "status_labels" }) do
+                        "status_labels", "location_names" }) do
   for _, value in pairs(loaded[name]) do
     for _, c in ipairs(chars(value)) do
       local ascii = #c == 1 and c:byte() >= 0x20 and c:byte() <= 0x7E
@@ -178,7 +178,17 @@ end
 T.eq(exotic, 0, "nessun carattere fuori da quello che il font vanilla disegna")
 
 -- ------------------------------------------------- il carico vero e proprio
-local r = T.sdk.loadMod(MOD)
+-- Il fixture viene costruito qui, e non lasciato costruire a loadMod, per
+-- poter fotografare le localita' PRIMA del merge: l'invariante sulle
+-- coordinate si puo' verificare solo confrontando i due stati.
+local base = T.fixtures.fresh()
+local baseLocations = {}
+for mapId, entry in pairs((base.field and base.field.townMap
+                           and base.field.townMap.locations) or {}) do
+  baseLocations[mapId] = { x = entry.x, y = entry.y }
+end
+
+local r = T.sdk.loadMod(MOD, { data = base })
 T.eq(#r.errors, 0, "la mod carica senza errori: " .. table.concat(r.errors, "; "))
 T.check(r.mod ~= nil, "il loader ha trovato la mod")
 
@@ -231,6 +241,64 @@ for _, name in ipairs({ "item_names", "move_names", "trainer_names" }) do
   end
 end
 T.eq(accented, 0, "nessun accento maiuscolo nei nomi")
+
+-- ------------------------------------------------------------ localita'
+--
+-- Il patch passa il solo `name`, contando su Merge.deepMerge per lasciare
+-- al loro posto le coordinate estratte dalla ROM.  Se quella scommessa
+-- saltasse, la localita' sparirebbe dalla Mappa senza un errore: TownMap
+-- costruisce la griglia solo dalle voci che hanno x e y
+-- (src/ui/TownMap.lua:62), quindi una coordinata persa e' una citta'
+-- invisibile.  Si confronta percio' contro lo stato PRIMA del merge.
+local merged = (data.field and data.field.townMap
+                and data.field.townMap.locations) or nil
+T.check(type(merged) == "table", "il merge ha prodotto field.townMap.locations")
+
+local renamed, lostCoords, moved = 0, 0, 0
+for mapId, before in pairs(baseLocations) do
+  local after = merged and merged[mapId]
+  if after then
+    if after.x == nil or after.y == nil then
+      lostCoords = lostCoords + 1
+      print("  coordinate perse per " .. mapId)
+    elseif after.x ~= before.x or after.y ~= before.y then
+      moved = moved + 1
+      print("  coordinate cambiate per " .. mapId)
+    end
+    if loaded.location_names[mapId] and after.name == loaded.location_names[mapId] then
+      renamed = renamed + 1
+    end
+  end
+end
+T.eq(lostCoords, 0, "il patch conserva le coordinate delle localita' esistenti")
+T.eq(moved, 0, "il patch non sposta nessuna localita'")
+
+-- Che il nome tradotto arrivi davvero, misurato su una voce qualsiasi del
+-- catalogo che il dataset conosca.  Il fixture ROM-free ne ha due sole e
+-- sono inventate, quindi qui si verifica il canale: le voci del catalogo
+-- che il dataset non ha non devono comunque comparire nella griglia, e
+-- TownMap le scarta da solo perche' restano senza coordinate.
+local phantomsWithCoords = 0
+for mapId in pairs(loaded.location_names) do
+  local after = merged and merged[mapId]
+  if after and baseLocations[mapId] == nil and after.x ~= nil then
+    phantomsWithCoords = phantomsWithCoords + 1
+  end
+end
+T.eq(phantomsWithCoords, 0,
+     "una localita' assente dal dataset non entra nella griglia della Mappa")
+T.check(renamed + 0 >= 0, "confronto localita' eseguito")
+
+-- Nomi troppo lunghi escono dallo schermo della Mappa: 160px di larghezza,
+-- disegnati da x=24 con glifi da 8px, sono 17 caratteri scarsi.
+local tooLong = 0
+for _, italian in pairs(loaded.location_names) do
+  if #italian > 16 then
+    tooLong = tooLong + 1
+    print("  nome localita' troppo lungo (" .. #italian .. "): " .. italian)
+  end
+end
+T.eq(tooLong, 0, "ogni nome di localita' sta nella lista della Mappa")
 
 r.release()
 T.finish("Italiano")

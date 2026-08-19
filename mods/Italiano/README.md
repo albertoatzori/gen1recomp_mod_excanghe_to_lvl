@@ -12,6 +12,7 @@ mod li riempie con criteri diversi:
 | `move_names.lua` | nomi delle mosse | id vanilla | 165 / 165 |
 | `trainer_names.lua` | classi di Allenatore | id vanilla | 30 / 47 |
 | `status_labels.lua` | sigle di stato nel riquadro PS | id dello stato | 5 / 5 |
+| `location_names.lua` | nomi delle localita' (Mappa, VOLO, ZONA) | id della mappa | 216 / 226 |
 | `species_names.lua` | nomi dei Pokemon | id vanilla | 0 / 155 |
 | `dialogue.lua` | copione estratto dalla ROM | etichetta pokered | 0 / 2585 |
 
@@ -30,7 +31,19 @@ di livello, quando viene catturato, quando e' esausto.
 
 Insieme a questi, i nomi che l'interfaccia mostra di continuo: tutte e
 165 le mosse, gli strumenti, le classi di Allenatore, le sigle degli
-stati alterati (DOR, CON, AVV, SCO, PAR).
+stati alterati (DOR, CON, AVV, SCO, PAR) e le localita' di Kanto --
+BIANCAVILLA, SMERALDOPOLI, PLUMBEOPOLI, CELESTOPOLI, ARANCIOPOLI,
+LAVANDONIA, AZZURROPOLI, FUCSIAPOLI, ZAFFERANOPOLI, ISOLA CANNELLA,
+ALTOPIANO BLU, i PERCORSO n, MONTE LUNA, BOSCO SMERALDO -- che compaiono
+sulla Mappa, nel menu VOLO e nella schermata ZONA del POKeDEX.
+
+I nomi delle localita' viaggiano dentro `field.townMap.locations`, non in
+un registry di record, e la mod ne riscrive il solo `name`: le coordinate
+x/y estratte dalla ROM restano dove sono. Non e' un dettaglio -- TownMap
+costruisce la griglia solo dalle voci che hanno x e y
+(`src/ui/TownMap.lua:62`), quindi una coordinata persa sarebbe una citta'
+invisibile sulla Mappa, senza nessun errore a segnalarlo. Il test
+confronta lo stato prima e dopo il merge proprio per questo.
 
 ## Cosa e' rimasto in inglese, e perche'
 

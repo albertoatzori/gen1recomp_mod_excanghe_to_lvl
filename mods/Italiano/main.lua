@@ -104,6 +104,27 @@ return function(mod)
     mod.content.statuses:patch(id, { label = value })
   end)
 
+  -- ---- localita' ------------------------------------------------------
+  -- I nomi che compaiono sulla Mappa, nel menu VOLO e nella schermata ZONA
+  -- del POKeDEX non stanno in un registry di record ma dentro field, sotto
+  -- townMap.locations, uno per id di mappa.
+  --
+  -- `field` ha semantica "deep" (src/mods/Schemas.lua R.field), e
+  -- Merge.deepMerge fonde i dizionari chiave per chiave: passare il solo
+  -- `name` lascia quindi al loro posto le coordinate x/y estratte dalla
+  -- ROM, che questa mod non ha nessun motivo di toccare.
+  local places = catalog("location_names")
+  if next(places) then
+    local locations = {}
+    for mapId, italian in pairs(places) do
+      if type(italian) == "string" and italian ~= "" then
+        locations[mapId] = { name = italian }
+        counts.places = (counts.places or 0) + 1
+      end
+    end
+    mod.content.field:patch("townMap", { locations = locations })
+  end
+
   -- ---- inserimento nomi ----------------------------------------------
   -- La griglia di lettere della schermata "dai un nome".  lang/naming.lua
   -- resta vuoto: l'alfabeto inglese contiene gia' tutte le lettere che
