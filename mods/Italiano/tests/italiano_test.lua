@@ -111,6 +111,72 @@ for _, name in ipairs({ "dialogue", "strings", "species_names", "move_names",
 end
 T.eq(badTypes, 0, "ogni voce dei cataloghi e' stringa -> stringa")
 
+-- ------------------------------------------ nessun glifo fuori dal vanilla
+--
+-- Questo e' l'invariante che tiene in piedi la scelta di NON registrare un
+-- font: se ogni carattere introdotto dalla traduzione e' gia' disegnabile
+-- dalle pagine vanilla, il TTF non serve, e senza TTF la griglia 8x8 resta
+-- quella che le schermate si aspettano.  Una vocale accentata infilata qui
+-- dentro romperebbe il patto in silenzio -- si vedrebbe come un buco a
+-- schermo, o costringerebbe a rimettere il TTF e con lui le sovrapposizioni
+-- nella lista della squadra.
+--
+-- Consentiti: ASCII stampabile, piu' i quattro extra che il font vanilla
+-- disegna davvero (verificati contro tools/rom_manifest.json: e-acuta usata
+-- in POKeMON, i puntini di sospensione, il triangolo e il simbolo della
+-- valuta).  Un carattere gia' presente nella frase inglese passa comunque:
+-- quello lo disegnava gia' il gioco, non lo stiamo introducendo noi.
+local VANILLA_EXTRA = { ["\195\169"] = true, ["\226\128\166"] = true,
+                        ["\226\150\182"] = true, ["\194\165"] = true }
+
+-- I caratteri di controllo non sono glifi ma impaginazione -- \n va a capo,
+-- \f apre una finestra, \v scorre -- e una traduzione piu' lunga
+-- dell'originale ha tutto il diritto di aggiungerne uno che l'inglese non
+-- aveva.  Il font non c'entra: non vengono disegnati.
+local LAYOUT = { ["\n"] = true, ["\r"] = true, ["\f"] = true, ["\v"] = true }
+
+-- itera i caratteri UTF-8 di una stringa
+local function chars(text)
+  local out, i = {}, 1
+  while i <= #text do
+    local b = text:byte(i)
+    local width = (b < 0x80 and 1) or (b < 0xE0 and 2) or (b < 0xF0 and 3) or 4
+    out[#out + 1] = text:sub(i, i + width - 1)
+    i = i + width
+  end
+  return out
+end
+
+local exotic = 0
+for source, italian in pairs(loaded.strings) do
+  if italian ~= "" then
+    local inSource = {}
+    for _, c in ipairs(chars(source)) do inSource[c] = true end
+    for _, c in ipairs(chars(italian)) do
+      local ascii = #c == 1 and c:byte() >= 0x20 and c:byte() <= 0x7E
+      if not (ascii or LAYOUT[c] or VANILLA_EXTRA[c] or inSource[c]) then
+        exotic = exotic + 1
+        print("  glifo fuori dal font vanilla: " .. c .. " in " ..
+              string.format("%q", italian))
+      end
+    end
+  end
+end
+for _, name in ipairs({ "item_names", "move_names", "trainer_names",
+                        "status_labels" }) do
+  for _, value in pairs(loaded[name]) do
+    for _, c in ipairs(chars(value)) do
+      local ascii = #c == 1 and c:byte() >= 0x20 and c:byte() <= 0x7E
+      if not (ascii or LAYOUT[c] or VANILLA_EXTRA[c]) then
+        exotic = exotic + 1
+        print("  glifo fuori dal font vanilla nei nomi: " .. c ..
+              " in " .. value)
+      end
+    end
+  end
+end
+T.eq(exotic, 0, "nessun carattere fuori da quello che il font vanilla disegna")
+
 -- ------------------------------------------------- il carico vero e proprio
 local r = T.sdk.loadMod(MOD)
 T.eq(#r.errors, 0, "la mod carica senza errori: " .. table.concat(r.errors, "; "))

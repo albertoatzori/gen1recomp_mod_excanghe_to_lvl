@@ -53,21 +53,33 @@ generazione le specie non sono tradotte, si chiamano come nell'originale.
 Il catalogo resta con le chiavi al loro posto per chi voglia cambiarle in
 una conversione totale.
 
-## Accenti
+## Accenti, e perche' il font non cambia
 
-`main.lua` registra il TTF Plain Pixel incluso nell'engine, che copre il
-latino accentato: e' quello che permette di scrivere e-grave e o-grave
-senza disegnare un foglio di glifi. Nelle etichette tutte maiuscole
-questa traduzione usa comunque la forma con apostrofo (VELOCITA', PUO'),
-che e' come si scrive in italiano quando il maiuscolo accentato non e'
-disponibile, ed e' anche piu' stretto nei menu.
+Questa mod **non registra nessun font**: il gioco continua a disegnare con
+le sue pagine di tile, esattamente come prima di installarla.
 
-Per tornare al font a tile disegnato a mano: togli la riga
-`mod.content.font:register("ttf", {})` da `main.lua`, poi descrivi la
-pagina di glifi in `lang/font.lua` e le sequenze in `lang/charmap.lua`.
-`lang/font.lua` non e' nel pacchetto perche' senza pagine da aggiungere
-sarebbe una tabella vuota; lo ricrea `modkit translation Italiano
---refresh`, e `main.lua` lo raccoglie da solo appena esiste.
+La scelta e' deliberata. L'engine include un TTF (Plain Pixel) che copre il
+latino accentato, e registrarlo sarebbe il modo rapido di avere e-grave e
+o-grave. Ma quel TTF sostituisce il font a tile per tutti i caratteri
+ordinari, e con esso cambiano larghezza e altezza di ogni riga: le
+schermate costruite sulla griglia 8x8 -- la lista della squadra su tutte,
+dove nome, barra PS e numeri stanno su misura -- finiscono per
+accavallarsi.
+
+Serviva a coprire le vocali accentate, e questa traduzione non ne usa
+nessuna: le scrive con l'apostrofo, in maiuscolo (VELOCITA', PUO') e in
+minuscolo (perche', e', piu'). E' l'uso italiano corrente quando l'accento
+non e' disponibile, ed e' anche piu' stretto nei menu. Ogni carattere che
+la mod introduce e' quindi gia' disegnabile dal font vanilla -- il test lo
+verifica riga per riga, cosi' la garanzia non si perde a una modifica
+distratta.
+
+Chi volesse gli accenti veri deve **aggiungere una pagina di glifi**
+(`lang/font.lua`, da `0x100` in su e' spazio libero sopra le pagine vanilla
+`$60`/`$80`) invece di sostituire il font intero: cosi' si aggiunge un
+alfabeto senza toccare la metrica di quello esistente. `main.lua` la
+raccoglie da sola appena il catalogo esiste, e
+`modkit translation Italiano --refresh` lo ricrea.
 
 ## Gioco in rete
 

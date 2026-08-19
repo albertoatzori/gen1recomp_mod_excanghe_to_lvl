@@ -83,18 +83,24 @@ vadano a capo.
 
 ## Accenti e maiuscole
 
-`main.lua` registra il TTF Plain Pixel dell'engine, che ha il latino
-accentato: nel testo normale si scrive `perche'`... o `perché`, funziona.
-Questa traduzione usa la forma con apostrofo nelle etichette tutte
-maiuscole (`VELOCITA'`, `PUO'`), che e' l'uso italiano corrente quando il
-maiuscolo accentato non c'e', ed e' anche piu' stretta nei menu.
+**Scrivi gli accenti con l'apostrofo**: `perche'`, `e'`, `piu'`,
+`VELOCITA'`, `PUO'`. Le pagine di font vanilla non hanno le vocali
+accentate, e finche' nessuna traduzione ne usa, il gioco puo' continuare a
+disegnare con le sue tile e la mod non deve toccare il font.
 
-Per il look a tile disegnato a mano al posto del TTF: togli
-`mod.content.font:register("ttf", {})` da `main.lua` e descrivi la pagina
-in `lang/font.lua`. L'engine disegna da **pagine di glifi**: un'immagine
-di celle 8x8 piu' una charmap che dice quale sequenza di byte disegna
-quale cella. Le pagine vanilla stanno a `$60` e `$80`; da `0x100` in su
-e' spazio libero, cosi' un alfabeto si aggiunge invece di sostituirle.
+Non registrare il TTF dell'engine per aggirare la cosa. Copre il latino
+accentato, ma sostituisce il font a tile per tutti i caratteri ordinari, e
+con esso cambia la metrica di ogni riga: le schermate costruite sulla
+griglia 8x8 -- la lista della squadra in particolare -- si accavallano.
+
+Il test rifiuta qualsiasi carattere che il font vanilla non sappia
+disegnare, quindi un accento vero viene intercettato prima di arrivare a
+schermo. Se ti servono davvero, **aggiungi** una pagina di glifi invece di
+sostituire il font: un'immagine di celle 8x8 piu' una charmap che dice
+quale sequenza di byte disegna quale cella, descritte in `lang/font.lua` e
+`lang/charmap.lua`. Le pagine vanilla stanno a `$60` e `$80`; da `0x100`
+in su e' spazio libero, cosi' un alfabeto si aggiunge senza toccare la
+metrica di quello esistente.
 
 ## Il ciclo di lavoro
 

@@ -50,22 +50,28 @@ return function(mod)
   end
 
   -- ---- glifi ---------------------------------------------------------
-  -- L'italiano ha bisogno di a-grave, e-grave, e-acuta, i-grave, o-grave e
-  -- u-grave, che le pagine di font vanilla ($60/$80) non contengono.  Il
-  -- TTF Plain Pixel incluso nell'engine ("Plain Pixel Font" di Douglas
-  -- Vautour (Burpy Fresh), CC-BY 4.0 -- vedi
-  -- assets/fonts/plainpixel/README.md) copre il latino accentato, quindi
-  -- registrandolo la traduzione non ha bisogno di nessun foglio di glifi:
-  -- bordi delle finestre e macro tipo <PK> restano tile.
-  mod.content.font:register("ttf", {})
-
-  -- Pagine di glifi aggiuntive, se un giorno si vuole il look disegnato a
-  -- mano al posto del TTF.  base e' il primo codice posseduto dalla
-  -- pagina; da 0x100 in su e' spazio libero sopra le pagine vanilla.
-  -- lang/font.lua non c'e': senza pagine da aggiungere sarebbe una tabella
-  -- vuota, e un catalogo assente vale come vuoto (catalog() ripiega su {}).
-  -- Lo ricrea `modkit translation Italiano --refresh`, e questo ciclo lo
-  -- raccoglie da solo appena esiste.
+  -- Nessun font viene registrato, ed e' una scelta, non una dimenticanza.
+  --
+  -- Registrare il TTF Plain Pixel sostituisce il font a tile per tutti i
+  -- caratteri ordinari, e con esso cambiano larghezza e altezza di ogni
+  -- riga: le schermate costruite sulla griglia 8x8 -- la lista della
+  -- squadra su tutte, dove nome, barra PS e numeri stanno su misura -- si
+  -- accavallano.  Serviva a coprire le vocali accentate, che le pagine
+  -- vanilla ($60/$80) non hanno.
+  --
+  -- Ma questa traduzione non ne usa nessuna: le maiuscole accentate sono
+  -- scritte con l'apostrofo (VELOCITA', PUO') e le minuscole pure
+  -- (perche', e', piu'), che e' l'uso italiano corrente quando l'accento
+  -- non c'e' ed e' anche piu' stretto nei menu.  Ogni carattere che questa
+  -- mod introduce e' quindi gia' disegnabile dal font vanilla, e il test
+  -- lo verifica riga per riga.  Senza vocali accentate da coprire, il TTF
+  -- non porta niente e costa il layout: resta fuori.
+  --
+  -- Chi volesse davvero gli accenti veri deve aggiungere una pagina di
+  -- glifi (lang/font.lua, da 0x100 in su e' spazio libero sopra le pagine
+  -- vanilla) invece di sostituire il font intero.  Il ciclo qui sotto la
+  -- raccoglie da sola appena il catalogo esiste; `modkit translation
+  -- Italiano --refresh` lo ricrea.
   for id, page in pairs(catalog("font")) do
     mod.content.font:register(id, page)
   end
