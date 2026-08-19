@@ -1,0 +1,19 @@
+{
+  "id": "italiano",
+  "name": "Italiano",
+  "version": "0.1.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "github": "albertoatzori/gen1recomp_mod_excanghe_to_lvl",
+  "game_version": ">=0.0.0-dev <1.0.0",
+  "category": "GAMEPLAY",
+  "priority": 100,
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "incompatible": [],
+  "games": ["gen1"],
+  "experimental": false,
+  "description": "Traduzione italiana: interfaccia, messaggi di lotta, nomi di strumenti, mosse, tipi e classi di Allenatore."
+}
